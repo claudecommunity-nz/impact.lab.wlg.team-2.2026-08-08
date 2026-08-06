@@ -9,9 +9,13 @@ Saturday 8 August 2026 · Waimanga Room, Wellington City Council
 
 > How might we give people a clear, location-specific picture of an emerging weather event by bringing together official warnings, Council information and trusted reports of local conditions?
 
-South coast events are often forecast by MetService and communicated through official channels, but those sources don't always show what is happening at street or neighbourhood level — road conditions, waves crossing the road, surface flooding or access becoming unsafe. Residents monitor MetService, WCC, WREMO, news media and local Facebook groups without knowing which source to rely on or how the information fits together.
+South coast events are often forecast by MetService and communicated through official channels. However, those sources do not always show what is happening at street or neighbourhood level — for example, the condition of roads, waves crossing the road, surface flooding or access becoming unsafe.
+
+Residents may monitor MetService, WCC, WREMO, news media and local Facebook groups, without knowing which source to rely on or how the information fits together. A prototype could bring those sources into one view, identify the source and time of each item, and clearly distinguish official advice from unverified community reports.
 
 **Desired outcome:** People can quickly understand what is forecast, what is happening locally, and where to find authoritative advice.
+
+*The common theme is improving the flow and use of information between communities and Council before and during an event.*
 
 ---
 
