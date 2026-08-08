@@ -25,5 +25,15 @@ public func configure(_ app: Application) async throws {
     app.middleware.use(cors)
     app.middleware.use(JSONErrorMiddleware())
 
+    // ISO-8601 timestamps with fractional seconds optional — contract uses Zulu.
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .iso8601
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    ContentConfiguration.global.use(encoder: encoder, for: .json)
+    ContentConfiguration.global.use(decoder: decoder, for: .json)
+
+    app.setupServices()
+
     try routes(app)
 }
