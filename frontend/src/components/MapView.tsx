@@ -169,7 +169,7 @@ export function MapView({ center, places, armedSlot, onMapClick }: Props) {
       if (existing) {
         existing.setLngLat(coords)
       } else {
-        hubMarkersRef.current[id] = new Marker({ element: createBadgeElement('🛟', '#0057a8') })
+        hubMarkersRef.current[id] = new Marker({ element: createBadgeElement('🏛️', '#0057a8') })
           .setLngLat(coords)
           .setPopup(
             new Popup({ offset: 16, maxWidth: '280px' }).setHTML(
@@ -200,7 +200,7 @@ export function MapView({ center, places, armedSlot, onMapClick }: Props) {
     if (!conditions) return
     for (const fault of conditions.waterFaults) {
       if (fault.lat === null || fault.lng === null) continue
-      const marker = new Marker({ element: createBadgeElement('🚰', '#0057a8') })
+      const marker = new Marker({ element: createBadgeElement('⛲', '#0057a8') })
         .setLngLat([fault.lng, fault.lat])
         .setPopup(
           new Popup({ offset: 16, maxWidth: '280px' }).setHTML(
