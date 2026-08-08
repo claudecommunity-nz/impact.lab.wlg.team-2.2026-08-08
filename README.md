@@ -63,6 +63,27 @@ Three traps worth knowing before you lose an hour to them:
 - **One query is silently capped** (`footpaths` has 8,130 features; a request
   returns 2,000). Page properly, or check `exceededTransferLimit`.
 
+## What we're building it as — the Location Picture
+
+A Swift (Vapor) service running locally on a Mac that answers one question
+for any lat/lng or community emergency hub: **what does this weather event
+mean here?** It joins official CAP warnings, live conditions (river gauges,
+electricity outages, water faults) and static hazard context (tsunami zones,
+coastal inundation, flood layers) into one `/v1/picture` response — every
+item carrying its source and age. Information, not advice. A separate
+workstream builds the public web map on the same API.
+
+Read the docs in order — they are the working brief:
+
+| Doc | What |
+|---|---|
+| [`docs/00-architecture.md`](docs/00-architecture.md) | problem, principles, system shape, stack ADR, repo layout |
+| [`docs/01-gates.md`](docs/01-gates.md) | build order G0–G7 with pass/fail tests — **the plan for the day** |
+| [`docs/02-api-contract.md`](docs/02-api-contract.md) | endpoints + example `/v1/picture` JSON (frontend builds against this) |
+| [`docs/03-datasets.md`](docs/03-datasets.md) | per-dataset endpoints, CRS rules, fields, minimal fetches, traps |
+| [`docs/04-pulse-reuse.md`](docs/04-pulse-reuse.md) | what we vendor/reimplement/skip from Omega's Pulse |
+| [`docs/05-demo-script.md`](docs/05-demo-script.md) | the 4-minute demo, two fixed locations |
+
 ## Schedule
 
 | Time | What |
@@ -93,4 +114,12 @@ Three traps worth knowing before you lose an hour to them:
 
 ## Licence
 
-Code here is MIT unless stated otherwise. The data is not covered by it.
+**All code in this repository is licensed under the GNU Affero General
+Public License v3.0 or later** (see [`LICENSE`](LICENSE)) — this repo states
+otherwise from the event default. AGPLv3 also makes us licence-compatible
+with [Omega Networks' Pulse](https://github.com/Omega-Networks/Pulse)
+(AGPL-3.0), whose spatial code we reuse where noted.
+
+The data is not covered by our licence. Each dataset belongs to its
+publisher — WCC, Greater Wellington, WREMO, NEMA, Wellington Water,
+MetService/Eagle, NIWA — and is attributed in every API response.

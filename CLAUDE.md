@@ -90,6 +90,42 @@ Three traps worth knowing before you lose an hour to them:
 - **Attribution.** Data belongs to its publishers and licences vary per dataset.
   Check before publishing anything derived.
 
+## How this team builds — read before writing code
+
+The working brief lives in `docs/` — read `00-architecture.md` and
+`01-gates.md` first, always. The short version:
+
+- **What we build:** the Location Picture service — Swift 6 + Vapor 4, runs
+  locally on a Mac (`swift run App` from `server/`), no database, no Docker.
+  It answers `/v1/picture?lat&lng`: official warnings + live conditions +
+  hazard context for that point, every item with `source` and `fetchedAt`.
+- **Gate discipline:** work proceeds G0→G7 per `docs/01-gates.md`. A gate is
+  done when its test command passes against the running server. Commit at
+  every gate pass. Do not start G5 before G2, G3 and G4 each pass. G2/G3/G4
+  parallelise on branches `gate-2-warnings` / `gate-3-conditions` /
+  `gate-4-hazards`.
+- **API contract:** `docs/02-api-contract.md` is frozen for the frontend
+  workstream — breaking it after G5 requires telling them first.
+- **Dataset access:** exactly as specified in `docs/03-datasets.md`. Every
+  ArcGIS query sends `outSR=4326`. Hilltop is XML, spaces are `%20` never
+  `+`, units come from the server's `<Units>` element. Check
+  `exceededTransferLimit`. Be polite to council hosts — sequential per host,
+  respect the cache TTLs.
+- **Architecture rules:** routes → services → clients, never routes →
+  upstream. Wire structs (`…Raw`) mirror upstream field names; domain
+  structs are clean; nothing downstream sees an upstream field name.
+  Everything crossing an actor boundary is `Sendable`. All geometry is
+  WGS84 end-to-end.
+- **Pulse reuse:** per `docs/04-pulse-reuse.md`. ConcaveHull and the GeoMath
+  helpers may be vendored verbatim (AGPL↔AGPL, keep headers); everything
+  touching Metal/MapKit/SwiftData stays out.
+- **Voice:** information, not advice. The summary builder never emits
+  "should / must / evacuate / safe" — there's a test for it. Empty states
+  are stated, not hidden. Planning layers are labelled as planning data.
+- **Licence:** everything we write is AGPL-3.0-or-later. New source files
+  get the SPDX header:
+  `// SPDX-License-Identifier: AGPL-3.0-or-later`
+
 ## Conventions
 
 - Keep the README's problem statement in sync if the scope shifts during the day.
