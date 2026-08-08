@@ -1,0 +1,31 @@
+# macOS / editor noise
+.DS_Store
+**/.DS_Store
+*.swp
+*~
+
+# Local dumps / scratch (never commit)
+fixtures/
+scripts/
+**/fixtures/
+vendor/
+
+# Agent / internal notes if recreated locally
+CLAUDE.md
+
+# SwiftPM / Xcode local state
+server/.build/
+server/.swiftpm/
+**/.build/
+**/.swiftpm/
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+**/xcuserdata/
+DerivedData/
+**/DerivedData/
+
+# Secrets / local env
+.env
+.env.*
+.netrc

@@ -1,0 +1,10 @@
+.DS_Store
+/.build
+/Packages
+xcuserdata/
+**/xcuserdata/
+DerivedData/
+.swiftpm/
+.netrc
+.env
+.env.*

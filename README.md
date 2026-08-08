@@ -1,96 +1,113 @@
-# Impact Lab Wellington — Team 2
+# Impact Lab Wellington: Team 2
 
-**Wellington City Council Emergency Management × Claude Code Community NZ**
-Saturday 8 August 2026 · Waimanga Room, Wellington City Council
+**Location Picture** is a local Swift/Vapor API that answers: *what does this weather event mean here?*
 
----
+Joins official CAP warnings, live conditions (gauges, electricity, water), and planning hazard layers for any lat/lng. Every fact carries `source` + `fetchedAt`. Information, not advice.
 
-## Problem 01 — Bring official warnings and local conditions into one clear community view
+Wellington City Council Emergency Management × Claude Code Community NZ · 8 Aug 2026.
 
-> How might we give people a clear, location-specific picture of an emerging weather event by bringing together official warnings, Council information and trusted reports of local conditions?
-
-South coast events are often forecast by MetService and communicated through official channels. However, those sources do not always show what is happening at street or neighbourhood level — for example, the condition of roads, waves crossing the road, surface flooding or access becoming unsafe.
-
-Residents may monitor MetService, WCC, WREMO, news media and local Facebook groups, without knowing which source to rely on or how the information fits together. A prototype could bring those sources into one view, identify the source and time of each item, and clearly distinguish official advice from unverified community reports.
-
-**Desired outcome:** People can quickly understand what is forecast, what is happening locally, and where to find authoritative advice.
-
-*The common theme is improving the flow and use of information between communities and Council before and during an event.*
+🖥 **Presentation:** [Google Slides](https://docs.google.com/presentation/d/1wclUhLOtDxCCHf1c-qu6v3hQkcyPwOPF/edit?usp=sharing)
 
 ---
 
-## What we're building
+## Run
 
-One working prototype, demoed in four minutes at 16:30.
-
-Each team's module is meant to slot into a shared **common operating picture** —
-a live map of emergency signals that the ten prototypes feed together. Aim for
-something that can be pointed at a map, a feed or an API, rather than a
-closed-off demo.
-
-Two teams work each problem statement independently. That's deliberate: two
-honest attempts at the same problem tell WCC more than one.
-
-## Data
-
-The public GIS datasets Wellington City Council Emergency Management shared are
-catalogued, checked and made queryable here:
-
-- **Catalogue + SDK** — https://github.com/claudecommunity-nz/wcc-emergency-gis-data
-- **Browse the datasets** — https://claudecommunity-nz.github.io/wcc-emergency-gis-data/
-
-74 datasets: flood, landslide, earthquake, tsunami, coastal inundation and
-climate layers, plus emergency hubs, post-quake road reopening order, water
-tanks, deprivation by area, and live river-level and rainfall telemetry.
-`wcc_gis.py` is a single file with no dependencies — copy it and
-`catalogue.json` into your project.
-
-```python
-import wcc_gis
-
-wcc_gis.ids("tsunami")                                    # find datasets
-wcc_gis.features("tsunami-evacuation-zones", at=(-41.2790, 174.7804))
-wcc_gis.geojson("footpaths", bbox=wcc_gis.WELLINGTON)     # straight into MapLibre
-wcc_gis.hilltop_data("Hutt River at Taita Gorge", "Flow")[-1]
+```bash
+cd server
+swift run App
+# http://127.0.0.1:8080  (also binds LAN; see boot log)
 ```
 
-Three traps worth knowing before you lose an hour to them:
+Requires Swift 6 + macOS. Override bind with `HOST=` / `PORT=`.
+Tests: `cd server && swift test` (GeoMath suite is offline; Hubs/Warnings hit live endpoints).
 
-- Everything is published in **NZTM2000, not lat/lng**. Request raw and your
-  pins land off the coast of Africa. Always ask for `outSR=4326`.
-- **A quarter of the layers are rasters** that advertise a query capability,
-  then refuse to answer. Ask them for a PNG instead.
-- **One query is silently capped** (`footpaths` has 8,130 features; a request
-  returns 2,000). Page properly, or check `exceededTransferLimit`.
+### Frontend (branch `2-frontend`)
 
-## Schedule
+Vite + React + MapLibre web UI, kept on its own branch:
 
-| Time | What |
+```bash
+git checkout 2-frontend
+cd frontend && npm install && npm run dev   # http://localhost:5173, expects API on :8080
+```
+
+---
+
+## API (live)
+
+| Path | Purpose |
 |---|---|
-| 08:00 | Arrival and mingle |
-| 09:00 | Opening address & problem briefing |
-| 09:30 | Build begins |
-| 12:30 | Lunch + lightning talks |
-| 16:00 | Submissions close |
-| 16:30 | Demos + judging |
-| 17:45 | Awards + next steps |
+| `GET /healthz` | Liveness |
+| `GET /v1/hubs` | Community emergency hubs (+ `?format=geojson`) |
+| `GET /v1/warnings` | CAP warnings (`?lat&lng` filters to point) |
+| `GET /v1/conditions?lat&lng` | Nearest gauges, outages, water faults |
+| `GET /v1/hazards?lat&lng` | Planning layers at point |
+| `GET /v1/picture?lat&lng` | Full Location Picture (or `?hub=<id>`) |
 
-## Ground rules
+Contract + example JSON: [`docs/02-api-contract.md`](docs/02-api-contract.md).
 
-- These are **hazard-planning layers, not live emergency information**.
-  In an emergency, call 111.
-- **The data is not ours.** Each dataset belongs to its publisher — WCC, Greater
-  Wellington, GNS Science, NIWA, Wellington Water, MBIE, NZTA, MetService.
-  Licence terms vary per dataset; check the dataset's page before publishing
-  anything derived from it, and credit the publisher.
-- Be considerate with request rates. These are council servers, and at least one
-  host throttles under concurrent load.
-- **Keep personal details out of this repo.** It is public. No participant
-  names, contact details or application material.
-- Treat public social content as a *signal to investigate*, never as verified
-  fact — surfacing something unverified as confirmed is the failure mode these
-  problem statements are most wary of.
+### Demo fixtures (offline / calm day)
+
+Curated scenarios, **not** live feeds:
+
+```bash
+curl -s localhost:8080/v1/demo/scenarios | jq .
+curl -s 'localhost:8080/v1/demo/picture?scenario=southerly-storm&point=lyall-bay' | jq .summary
+curl -s 'localhost:8080/v1/demo/picture?scenario=southerly-storm&point=karori' | jq .summary
+
+# Map layers (GeoJSON polygons + pins)
+curl -s 'localhost:8080/v1/demo/warnings?scenario=southerly-storm&point=lyall-bay&format=geojson'
+curl -s 'localhost:8080/v1/demo/hazards?scenario=southerly-storm&point=lyall-bay&format=geojson'
+curl -s 'localhost:8080/v1/demo/conditions?scenario=southerly-storm&point=lyall-bay&format=geojson'
+```
+
+Details: [`docs/07-demo-data.md`](docs/07-demo-data.md).
+**Demo anchors:** Lyall Bay `-41.3286, 174.7947` · Karori `-41.2865, 174.7405`.
+
+---
+
+## Data sources (wired)
+
+| Category | Sources |
+|---|---|
+| Warnings | MetService CAP, NEMA CAP |
+| Live | GW Hilltop gauges, NEMA electricity outages, Wellington Water faults |
+| Hazards | WCC tsunami zones, coastal inundation (medium/high), stream corridor |
+| Anchors | WREMO community emergency hubs |
+
+GIS catalogue (74 layers, reference only, not vendored here):  
+https://github.com/claudecommunity-nz/wcc-emergency-gis-data
+
+---
+
+## Layout
+
+```
+server/     Vapor app (Sources, Tests)
+docs/       API contract + demo data notes
+LICENSE     AGPL-3.0-or-later
+```
+
+---
+
+## Known limitations (read before evaluating)
+
+- **Prototype on hazard-planning data, not an operational emergency source.**
+- Multipart warning polygons (one alert, several disjoint areas) can be missed
+  by the point filter. Known bug, fix identified (even-odd parity in
+  `GeoMath.pointInPolygonRings`), not landed by the deadline.
+- On `/v1/warnings`, a fully failed upstream currently looks like "no
+  warnings"; per-source status is reported on `/v1/picture` only.
+- Live feeds were calm in Wellington on build day, so the demo scenario is
+  clearly namespaced under `/v1/demo` so live and staged are never confused.
+- 4 of ~15 relevant planning layers wired; each additional layer is one URL +
+  label in `HazardsService`.
+- No community reports yet; the `trust` field reserves `community-unverified`.
+
+---
 
 ## Licence
 
-Code here is MIT unless stated otherwise. The data is not covered by it.
+Code: **AGPL-3.0-or-later** ([`LICENSE`](LICENSE)).  
+Data belongs to its publishers (WCC, GW, WREMO, NEMA, Wellington Water, MetService, NIWA) and is attributed in every response.
+
+In an emergency call **111**.
