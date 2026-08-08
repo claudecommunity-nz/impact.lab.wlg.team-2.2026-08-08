@@ -104,6 +104,25 @@ func routes(_ app: Application) throws {
         }
         return await req.services.hazards.hazards(at: .init(lat: lat, lng: lng))
     }
+
+    // G5 — full Location Picture (fan-out + factual summary)
+    v1.get("picture") { req -> LocationPicture in
+        let lat = req.query[Double.self, at: "lat"]
+        let lng = req.query[Double.self, at: "lng"]
+        let hubId = req.query[Int.self, at: "hub"]
+
+        switch (lat, lng, hubId) {
+        case let (lat?, lng?, _):
+            // Prefer explicit coordinates when both lat/lng and hub are present.
+            return await req.services.picture.picture(at: .init(lat: lat, lng: lng))
+        case (nil, nil, let hubId?):
+            return try await req.services.picture.picture(hubId: hubId)
+        case (nil, nil, nil):
+            throw Abort(.badRequest, reason: "Provide lat and lng, or hub=<id>")
+        default:
+            throw Abort(.badRequest, reason: "Provide both lat and lng, or hub=<id>")
+        }
+    }
 }
 
 struct HealthzResponse: Content {
