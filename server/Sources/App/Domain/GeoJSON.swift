@@ -63,3 +63,74 @@ extension Hub {
         )
     }
 }
+
+// MARK: - Polygon GeoJSON (warnings)
+
+struct GeoJSONPolygonGeometry: Codable, Sendable {
+    let type: String
+    /// GeoJSON Polygon: array of linear rings; each ring is `[lng, lat]` pairs.
+    let coordinates: [[[Double]]]
+
+    static func from(rings: [[GeoMath.Coordinate]]) -> GeoJSONPolygonGeometry {
+        let coords = rings.map { ring in
+            var pairs = ring.map { [$0.lng, $0.lat] }
+            // Close ring if needed.
+            if let first = pairs.first, let last = pairs.last, first != last {
+                pairs.append(first)
+            }
+            return pairs
+        }
+        return GeoJSONPolygonGeometry(type: "Polygon", coordinates: coords)
+    }
+}
+
+struct GeoJSONPolygonFeature<P: Codable & Sendable>: Codable, Sendable {
+    let type: String
+    let geometry: GeoJSONPolygonGeometry
+    let properties: P
+
+    init(geometry: GeoJSONPolygonGeometry, properties: P) {
+        self.type = "Feature"
+        self.geometry = geometry
+        self.properties = properties
+    }
+}
+
+struct GeoJSONPolygonFeatureCollection<P: Codable & Sendable>: Codable, Sendable {
+    let type: String
+    let features: [GeoJSONPolygonFeature<P>]
+
+    init(features: [GeoJSONPolygonFeature<P>]) {
+        self.type = "FeatureCollection"
+        self.features = features
+    }
+}
+
+struct WarningGeoJSONProperties: Codable, Sendable {
+    let id: String
+    let event: String
+    let headline: String?
+    let severity: String?
+    let urgency: String?
+    let certainty: String?
+    let areaDesc: String?
+    let sourceId: String
+}
+
+extension WarningRecord {
+    func asGeoJSONFeature() -> GeoJSONPolygonFeature<WarningGeoJSONProperties> {
+        GeoJSONPolygonFeature(
+            geometry: .from(rings: rings),
+            properties: WarningGeoJSONProperties(
+                id: warning.id,
+                event: warning.event,
+                headline: warning.headline,
+                severity: warning.severity,
+                urgency: warning.urgency,
+                certainty: warning.certainty,
+                areaDesc: warning.areaDesc,
+                sourceId: warning.source.id
+            )
+        )
+    }
+}

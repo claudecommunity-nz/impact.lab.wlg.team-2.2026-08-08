@@ -6,6 +6,7 @@ struct AppServices: Sendable {
     let cache: SourceCache
     let arcgis: ArcGISClient
     let hubs: HubsService
+    let warnings: WarningsService
 }
 
 enum AppServicesKey: StorageKey {
@@ -27,7 +28,8 @@ extension Application {
         let cache = SourceCache()
         let arcgis = ArcGISClient(client: client, logger: logger)
         let hubs = HubsService(arcgis: arcgis, cache: cache)
-        services = AppServices(cache: cache, arcgis: arcgis, hubs: hubs)
+        let warnings = WarningsService(arcgis: arcgis, cache: cache, logger: logger)
+        services = AppServices(cache: cache, arcgis: arcgis, hubs: hubs, warnings: warnings)
     }
 }
 

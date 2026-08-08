@@ -38,6 +38,39 @@ func routes(_ app: Application) throws {
         try response.content.encode(envelope, as: .json)
         return response
     }
+
+    // G2 — official CAP warnings (MetService + NEMA)
+    v1.get("warnings") { req -> Response in
+        let lat = req.query[Double.self, at: "lat"]
+        let lng = req.query[Double.self, at: "lng"]
+        let point: GeoMath.Coordinate?
+        switch (lat, lng) {
+        case (nil, nil):
+            point = nil
+        case let (lat?, lng?):
+            point = GeoMath.Coordinate(lat: lat, lng: lng)
+        default:
+            throw Abort(.badRequest, reason: "Provide both lat and lng, or neither for NZ-wide list")
+        }
+
+        let records = try await req.services.warnings.warningRecords(at: point)
+        let format = (req.query[String.self, at: "format"] ?? "json").lowercased()
+
+        if format == "geojson" {
+            let collection = GeoJSONPolygonFeatureCollection(
+                features: records.map { $0.asGeoJSONFeature() }
+            )
+            let response = Response(status: .ok)
+            try response.content.encode(collection, as: .json)
+            return response
+        }
+
+        let items = records.map(\.warning)
+        let envelope = WarningsEnvelope(items: items, count: items.count)
+        let response = Response(status: .ok)
+        try response.content.encode(envelope, as: .json)
+        return response
+    }
 }
 
 struct HealthzResponse: Content {

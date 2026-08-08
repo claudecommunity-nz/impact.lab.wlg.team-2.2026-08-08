@@ -7,9 +7,13 @@ enum AppStart {
 }
 
 public func configure(_ app: Application) async throws {
-    // Bind explicitly so demo curls hit a known port.
-    app.http.server.configuration.hostname = "127.0.0.1"
-    app.http.server.configuration.port = 8080
+    // Bind localhost. Port defaults to 8080; override with PORT=… if busy
+    // (e.g. another `swift run App` or Xcode instance already listening).
+    let hostname = Environment.get("HOST") ?? "127.0.0.1"
+    let port = Environment.get("PORT").flatMap(Int.init) ?? 8080
+    app.http.server.configuration.hostname = hostname
+    app.http.server.configuration.port = port
+    app.logger.info("Binding http://\(hostname):\(port) (set PORT= to override)")
 
     // Replace the default stack so unknown routes never return HTML.
     app.middleware = .init()
