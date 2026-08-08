@@ -1,9 +1,9 @@
 export function Header() {
   return (
     <header className="flex items-center justify-between border-b-4 border-wcc-yellow bg-wcc-charcoal px-4 py-3 sm:px-6">
-      <h1 className="text-xl font-bold tracking-tight text-wcc-white sm:text-2xl">
-        Welly <span className="text-wcc-yellow">Alerts</span>
-      </h1>
+      <div className="rounded-md bg-wcc-white px-2 py-1">
+        <img src="/ImpactLab_Logo_HeadsupWelly.png" alt="Heads Up Welly" className="h-9 w-auto sm:h-11" />
+      </div>
       <button
         type="button"
         disabled

@@ -13,6 +13,8 @@ import '../lib/maplibreWorker'
 import { WELLINGTON_CBD } from '../constants'
 import { useWarningsOverlay } from '../hooks/useWarningsOverlay'
 import { useHubsOverlay } from '../hooks/useHubsOverlay'
+import { useConditions } from '../hooks/useConditions'
+import { formatAge } from '../lib/time'
 import type { LatLng, Place } from '../types'
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
@@ -37,6 +39,15 @@ function colorForPlace(place: Place, nonHomeIndex: number) {
   return PLACE_COLORS[nonHomeIndex % PLACE_COLORS.length]
 }
 
+function createBadgeElement(emoji: string, borderColor: string): HTMLDivElement {
+  const el = document.createElement('div')
+  el.textContent = emoji
+  el.className =
+    'flex h-7 w-7 items-center justify-center rounded-full border-2 bg-wcc-white text-base shadow'
+  el.style.borderColor = borderColor
+  return el
+}
+
 interface Props {
   center: LatLng | null
   places: Place[]
@@ -49,15 +60,16 @@ export function MapView({ center, places, armedSlot, onMapClick }: Props) {
   const mapRef = useRef<MapLibreMap | null>(null)
   const youMarkerRef = useRef<Marker | null>(null)
   const markersRef = useRef<Record<string, Marker>>({})
+  const hubMarkersRef = useRef<Record<string, Marker>>({})
+  const waterFaultMarkersRef = useRef<Marker[]>([])
   const onMapClickRef = useRef(onMapClick)
   onMapClickRef.current = onMapClick
 
   const { data: warningsGeoJSON } = useWarningsOverlay()
   const { data: hubsGeoJSON } = useHubsOverlay()
+  const { conditions } = useConditions(center?.lat, center?.lng)
   const warningsDataRef = useRef(warningsGeoJSON)
   warningsDataRef.current = warningsGeoJSON
-  const hubsDataRef = useRef(hubsGeoJSON)
-  hubsDataRef.current = hubsGeoJSON
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
@@ -102,22 +114,6 @@ export function MapView({ center, places, armedSlot, onMapClick }: Props) {
         paint: { 'line-color': SEVERITY_COLOR_EXPRESSION as unknown as string, 'line-width': 2, 'line-opacity': 0.7 },
       })
 
-      map.addSource('hubs', {
-        type: 'geojson',
-        data: hubsDataRef.current as unknown as GeoJSON.FeatureCollection,
-      })
-      map.addLayer({
-        id: 'hubs-points',
-        type: 'circle',
-        source: 'hubs',
-        paint: {
-          'circle-radius': 5,
-          'circle-color': '#0057a8',
-          'circle-stroke-width': 1.5,
-          'circle-stroke-color': '#ffffff',
-        },
-      })
-
       map.on('click', 'warnings-fill', (event) => {
         const props = event.features?.[0]?.properties
         if (!props) return
@@ -134,25 +130,6 @@ export function MapView({ center, places, armedSlot, onMapClick }: Props) {
         map.getCanvas().style.cursor = 'pointer'
       })
       map.on('mouseleave', 'warnings-fill', () => {
-        map.getCanvas().style.cursor = ''
-      })
-
-      map.on('click', 'hubs-points', (event) => {
-        const props = event.features?.[0]?.properties
-        if (!props) return
-        new Popup({ offset: 12, maxWidth: '280px' })
-          .setLngLat(event.lngLat)
-          .setHTML(
-            `<strong>${props.name}</strong>${props.type ? `<br/>${props.type}` : ''}${
-              props.address ? `<br/>${props.address}` : ''
-            }`,
-          )
-          .addTo(map)
-      })
-      map.on('mouseenter', 'hubs-points', () => {
-        map.getCanvas().style.cursor = 'pointer'
-      })
-      map.on('mouseleave', 'hubs-points', () => {
         map.getCanvas().style.cursor = ''
       })
     })
@@ -179,9 +156,65 @@ export function MapView({ center, places, armedSlot, onMapClick }: Props) {
   }, [warningsGeoJSON])
 
   useEffect(() => {
-    const source = mapRef.current?.getSource('hubs') as GeoJSONSource | undefined
-    source?.setData(hubsGeoJSON as unknown as GeoJSON.FeatureCollection)
+    const map = mapRef.current
+    if (!map) return
+
+    const seenIds = new Set<string>()
+    for (const feature of hubsGeoJSON.features) {
+      const props = feature.properties as { id: number | string; name: string; type?: string; address?: string }
+      const coords = feature.geometry.coordinates as [number, number]
+      const id = String(props.id)
+      seenIds.add(id)
+      const existing = hubMarkersRef.current[id]
+      if (existing) {
+        existing.setLngLat(coords)
+      } else {
+        hubMarkersRef.current[id] = new Marker({ element: createBadgeElement('🛟', '#0057a8') })
+          .setLngLat(coords)
+          .setPopup(
+            new Popup({ offset: 16, maxWidth: '280px' }).setHTML(
+              `<strong>${props.name}</strong>${props.type ? `<br/>${props.type}` : ''}${
+                props.address ? `<br/>${props.address}` : ''
+              }`,
+            ),
+          )
+          .addTo(map)
+      }
+    }
+
+    Object.keys(hubMarkersRef.current).forEach((id) => {
+      if (!seenIds.has(id)) {
+        hubMarkersRef.current[id].remove()
+        delete hubMarkersRef.current[id]
+      }
+    })
   }, [hubsGeoJSON])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    waterFaultMarkersRef.current.forEach((marker) => marker.remove())
+    waterFaultMarkersRef.current = []
+
+    if (!conditions) return
+    for (const fault of conditions.waterFaults) {
+      if (fault.lat === null || fault.lng === null) continue
+      const marker = new Marker({ element: createBadgeElement('🚰', '#0057a8') })
+        .setLngLat([fault.lng, fault.lat])
+        .setPopup(
+          new Popup({ offset: 16, maxWidth: '280px' }).setHTML(
+            `<strong>${fault.description ?? 'Water fault'}</strong>${
+              fault.address ? `<br/>${fault.address}` : ''
+            }${fault.status ? `<br/>${fault.status}` : ''}${
+              fault.reportedAt ? `<br/><span style="color:#595959">${formatAge(fault.reportedAt)}</span>` : ''
+            }`,
+          ),
+        )
+        .addTo(map)
+      waterFaultMarkersRef.current.push(marker)
+    }
+  }, [conditions])
 
   useEffect(() => {
     const map = mapRef.current
