@@ -49,4 +49,33 @@ struct ConditionsTests {
         let d = HilltopClient.parseHilltopTime("2026-08-08T10:40:00")
         #expect(d != nil)
     }
+
+    @Test("Water status filter drops resolved and non-public jobs")
+    func waterStatusFilter() {
+        #expect(ConditionsService.isInactiveWaterStatus(status: "COMP", statusDescription: nil))
+        #expect(ConditionsService.isInactiveWaterStatus(status: nil, statusDescription: "Resolved"))
+        #expect(ConditionsService.isInactiveWaterStatus(status: nil, statusDescription: "Do Not Display"))
+        #expect(ConditionsService.isInactiveWaterStatus(status: "CLOSED", statusDescription: "Closed"))
+        #expect(!ConditionsService.isInactiveWaterStatus(status: "INPRG", statusDescription: "In Progress"))
+        #expect(!ConditionsService.isInactiveWaterStatus(status: "NEW", statusDescription: "New"))
+        #expect(!ConditionsService.isInactiveWaterStatus(status: nil, statusDescription: "Under Investigation"))
+    }
+
+    @Test("GET /v1/conditions caps water faults and drops inactive statuses")
+    func waterFaultsCappedAndClean() async throws {
+        try await withApp(configure: configure) { app in
+            try await app.testing().test(
+                .GET,
+                "v1/conditions?lat=-41.3286&lng=174.7947&n=5&radiusKm=10"
+            ) { res async throws in
+                #expect(res.status == .ok)
+                let body = try res.content.decode(ConditionsEnvelope.self)
+                #expect(body.waterFaults.count <= 5)
+                #expect(body.electricityOutages.count <= 5)
+                for f in body.waterFaults {
+                    #expect(!ConditionsService.isInactiveWaterStatus(status: f.status, statusDescription: nil))
+                }
+            }
+        }
+    }
 }

@@ -120,8 +120,8 @@ actor ConditionsService {
         // Fan out independent source groups carefully: Hilltop is sequential
         // internally; ArcGIS layers are separate hosts.
         async let gaugesTask = fetchGauges(at: point, n: n, radiusKm: radiusKm)
-        async let outagesTask = fetchOutages(at: point, radiusKm: radiusKm)
-        async let waterTask = fetchWaterFaults(at: point, radiusKm: radiusKm)
+        async let outagesTask = fetchOutages(at: point, n: n, radiusKm: radiusKm)
+        async let waterTask = fetchWaterFaults(at: point, n: n, radiusKm: radiusKm)
 
         let gauges = await gaugesTask
         let outages = await outagesTask
@@ -131,6 +131,21 @@ actor ConditionsService {
             electricityOutages: outages,
             waterFaults: water
         )
+    }
+
+    /// Drop closed, resolved, or non-public water jobs (code + display description).
+    static func isInactiveWaterStatus(status: String?, statusDescription: String?) -> Bool {
+        for raw in [status, statusDescription].compactMap({ $0 }) {
+            let s = raw.uppercased()
+            if s.contains("DO NOT DISPLAY") { return true }
+            if s.contains("RESOLVED") { return true }
+            if s.contains("CANCEL") { return true }
+            if s.contains("COMPLETE") { return true }
+            if s.contains("CLOSED") { return true }
+            let token = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            if token == "COMP" || token == "CLOSE" || token == "CLO" { return true }
+        }
+        return false
     }
 
     // MARK: - Gauges
@@ -277,10 +292,10 @@ actor ConditionsService {
 
     // MARK: - Outages
 
-    private func fetchOutages(at point: GeoMath.Coordinate, radiusKm: Double) async -> [ElectricityOutage] {
+    private func fetchOutages(at point: GeoMath.Coordinate, n: Int, radiusKm: Double) async -> [ElectricityOutage] {
         do {
             if let cached = await cache.getFresh("outages-wellington", as: [ElectricityOutage].self) {
-                return filterOutages(cached.value, at: point, radiusKm: radiusKm)
+                return filterOutages(cached.value, at: point, n: n, radiusKm: radiusKm)
             }
 
             let (features, fetchedAt): ([ArcGISFeature<OutageRawAttributes>], Date) =
@@ -327,7 +342,7 @@ actor ConditionsService {
             }
 
             await cache.set("outages-wellington", value: all, ttl: Self.conditionsTTL, fetchedAt: fetchedAt)
-            return filterOutages(all, at: point, radiusKm: radiusKm)
+            return filterOutages(all, at: point, n: n, radiusKm: radiusKm)
         } catch {
             logger.warning("Electricity outages failed: \(error)")
             return []
@@ -337,10 +352,11 @@ actor ConditionsService {
     private func filterOutages(
         _ all: [ElectricityOutage],
         at point: GeoMath.Coordinate,
+        n: Int,
         radiusKm: Double
     ) -> [ElectricityOutage] {
         let origin = GeoMath.Coordinate(lat: point.lat, lng: point.lng)
-        return all.compactMap { o -> ElectricityOutage? in
+        let filtered = all.compactMap { o -> ElectricityOutage? in
             guard let lat = o.lat, let lng = o.lng else { return nil }
             let d = GeoMath.haversineKm(from: origin, to: .init(lat: lat, lng: lng))
             guard d <= radiusKm else { return nil }
@@ -359,14 +375,15 @@ actor ConditionsService {
             )
         }
         .sorted { $0.distanceKm < $1.distanceKm }
+        return Array(filtered.prefix(n))
     }
 
     // MARK: - Water faults
 
-    private func fetchWaterFaults(at point: GeoMath.Coordinate, radiusKm: Double) async -> [WaterFault] {
+    private func fetchWaterFaults(at point: GeoMath.Coordinate, n: Int, radiusKm: Double) async -> [WaterFault] {
         do {
             if let cached = await cache.getFresh("water-faults-wellington", as: [WaterFault].self) {
-                return filterWater(cached.value, at: point, radiusKm: radiusKm)
+                return filterWater(cached.value, at: point, n: n, radiusKm: radiusKm)
             }
 
             let (features, fetchedAt): ([ArcGISFeature<WaterFaultRawAttributes>], Date) =
@@ -389,9 +406,11 @@ actor ConditionsService {
             let origin = GeoMath.Coordinate(lat: point.lat, lng: point.lng)
             let all: [WaterFault] = features.compactMap { feature in
                 let raw = feature.attributes
-                // Drop completed/closed jobs client-side.
-                let status = (raw.status ?? "").uppercased()
-                if status.contains("COMP") || status.contains("CLOSED") || status.contains("CLOSE") {
+                // Drop resolved / closed / non-public jobs before caching.
+                if Self.isInactiveWaterStatus(
+                    status: raw.status,
+                    statusDescription: raw.StatusDescription
+                ) {
                     return nil
                 }
                 let lat = feature.geometry?.y
@@ -416,7 +435,7 @@ actor ConditionsService {
             }
 
             await cache.set("water-faults-wellington", value: all, ttl: Self.conditionsTTL, fetchedAt: fetchedAt)
-            return filterWater(all, at: point, radiusKm: radiusKm)
+            return filterWater(all, at: point, n: n, radiusKm: radiusKm)
         } catch {
             logger.warning("Water faults failed: \(error)")
             return []
@@ -426,10 +445,15 @@ actor ConditionsService {
     private func filterWater(
         _ all: [WaterFault],
         at point: GeoMath.Coordinate,
+        n: Int,
         radiusKm: Double
     ) -> [WaterFault] {
         let origin = GeoMath.Coordinate(lat: point.lat, lng: point.lng)
-        return all.compactMap { f -> WaterFault? in
+        let filtered = all.compactMap { f -> WaterFault? in
+            // Re-check in case older cache entries pre-date the expanded filter.
+            if Self.isInactiveWaterStatus(status: f.status, statusDescription: nil) {
+                return nil
+            }
             guard let lat = f.lat, let lng = f.lng else { return nil }
             let d = GeoMath.haversineKm(from: origin, to: .init(lat: lat, lng: lng))
             guard d <= radiusKm else { return nil }
@@ -446,5 +470,6 @@ actor ConditionsService {
             )
         }
         .sorted { $0.distanceKm < $1.distanceKm }
+        return Array(filtered.prefix(n))
     }
 }
