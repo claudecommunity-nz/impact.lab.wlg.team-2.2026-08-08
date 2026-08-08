@@ -5,6 +5,10 @@ const STORAGE_KEY = 'wellyalerts.places'
 
 const DEFAULT_PLACES: Place[] = [{ id: 'home', label: 'Home', position: null, visible: true }]
 
+function generateId(): string {
+  return `place-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+}
+
 function load(): Place[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -24,7 +28,7 @@ export function useSavedLocations() {
   }, [places])
 
   function addPlace(label: string): string {
-    const id = crypto.randomUUID()
+    const id = generateId()
     setPlaces((prev) => [...prev, { id, label, position: null, visible: true }])
     return id
   }
