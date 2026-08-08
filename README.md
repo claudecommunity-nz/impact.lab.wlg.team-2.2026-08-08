@@ -27,12 +27,23 @@ Tests: `cd server && swift test` (GeoMath suite is offline; Hubs/Warnings hit li
 
 Vite + React + MapLibre web UI:
 
-
-
 ```bash
 git checkout 2-frontend
 cd frontend && npm install && npm run dev   # http://localhost:5173, expects API on :8080
 ```
+
+### SwiftUI client (branch `3-swiftui`)
+
+Multiplatform **SwiftUI** app (macOS + iOS) for Location Picture — Demo + Live against this API:
+
+```bash
+git checkout 3-swiftui
+cd server && swift run App                  # terminal 1 — :8080
+open swiftui/LocationPicture/LocationPicture.xcodeproj
+# Xcode destination: My Mac or iPhone Simulator
+```
+
+Details: [`swiftui/LocationPicture/README.md`](swiftui/LocationPicture/README.md).
 
 ---
 
@@ -107,6 +118,7 @@ https://github.com/claudecommunity-nz/wcc-emergency-gis-data
 ```
 server/     Vapor app (Sources, Tests) — open-source Swift API
 frontend/   Vite + React + MapLibre (branch 2-frontend)
+swiftui/    SwiftUI client — macOS + iOS (branch 3-swiftui)
 docs/       API contract + demo data notes
 LICENSE     AGPL-3.0-or-later
 ```

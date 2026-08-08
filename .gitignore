@@ -18,8 +18,13 @@ server/.build/
 server/.swiftpm/
 **/.build/
 **/.swiftpm/
+# Ignore Xcode projects by default, but track the SwiftUI app project
 *.xcodeproj/
+!swiftui/**/*.xcodeproj/
+!swiftui/**/*.xcodeproj/**
 *.xcworkspace/
+!swiftui/**/*.xcworkspace/
+!swiftui/**/*.xcworkspace/**
 xcuserdata/
 **/xcuserdata/
 DerivedData/
