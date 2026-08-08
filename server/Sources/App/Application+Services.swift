@@ -11,6 +11,7 @@ struct AppServices: Sendable {
     let conditions: ConditionsService
     let hazards: HazardsService
     let picture: PictureService
+    let demo: DemoService
 }
 
 enum AppServicesKey: StorageKey {
@@ -48,6 +49,7 @@ extension Application {
             hazards: hazards,
             logger: logger
         )
+        let demo = DemoService()
         services = AppServices(
             cache: cache,
             arcgis: arcgis,
@@ -56,7 +58,8 @@ extension Application {
             warnings: warnings,
             conditions: conditions,
             hazards: hazards,
-            picture: picture
+            picture: picture,
+            demo: demo
         )
     }
 }

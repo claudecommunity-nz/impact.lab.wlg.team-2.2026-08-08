@@ -1,0 +1,12 @@
+.DS_Store
+
+# Live snapshot dumps from scripts/test-snapshot.sh — never commit
+# (path varies depending on cwd; cover both)
+fixtures/snapshots/
+scripts/fixtures/snapshots/
+**/fixtures/snapshots/
+
+# Derived build products
+server/.build/
+*.xcodeproj/
+xcuserdata/

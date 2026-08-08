@@ -123,6 +123,38 @@ func routes(_ app: Application) throws {
             throw Abort(.badRequest, reason: "Provide both lat and lng, or hub=<id>")
         }
     }
+
+    // Demo fixtures — curated mock data (not live). Separate namespace so
+    // judges never confuse staged scenarios with production feeds.
+    let demo = v1.grouped("demo")
+
+    demo.get("scenarios") { req -> DemoCatalog in
+        req.services.demo.catalog()
+    }
+
+    demo.get("picture") { req -> LocationPicture in
+        let scenario = try req.query.get(String.self, at: "scenario")
+        let point = try req.query.get(String.self, at: "point")
+        return try req.services.demo.picture(scenarioId: scenario, pointId: point)
+    }
+
+    demo.get("warnings") { req -> OfficialWarningsSection in
+        let scenario = try req.query.get(String.self, at: "scenario")
+        let point = try req.query.get(String.self, at: "point")
+        return try req.services.demo.warnings(scenarioId: scenario, pointId: point)
+    }
+
+    demo.get("conditions") { req -> LocalConditionsSection in
+        let scenario = try req.query.get(String.self, at: "scenario")
+        let point = try req.query.get(String.self, at: "point")
+        return try req.services.demo.conditions(scenarioId: scenario, pointId: point)
+    }
+
+    demo.get("hazards") { req -> HazardsEnvelope in
+        let scenario = try req.query.get(String.self, at: "scenario")
+        let point = try req.query.get(String.self, at: "point")
+        return try req.services.demo.hazards(scenarioId: scenario, pointId: point)
+    }
 }
 
 struct HealthzResponse: Content {
