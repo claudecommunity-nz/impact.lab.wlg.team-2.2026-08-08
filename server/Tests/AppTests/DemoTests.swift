@@ -122,6 +122,11 @@ struct DemoTests {
         let lyall = GeoMath.Coordinate(lat: -41.3286, lng: 174.7947)
         let karori = GeoMath.Coordinate(lat: -41.2865, lng: 174.7405)
 
+        // Multi-vertex rings (not 4-corner boxes) — map clients must not draw squares.
+        #expect(DemoScenarioData.wellingtonWarningRing.count >= 12)
+        #expect(DemoScenarioData.tsunamiOrangeRing.count >= 12)
+        #expect(DemoScenarioData.coastalInundationRing.count >= 10)
+
         #expect(GeoMath.pointInPolygon(point: lyall, ring: DemoScenarioData.wellingtonWarningRing))
         #expect(GeoMath.pointInPolygon(point: karori, ring: DemoScenarioData.wellingtonWarningRing))
         #expect(GeoMath.pointInPolygon(point: lyall, ring: DemoScenarioData.tsunamiOrangeRing))

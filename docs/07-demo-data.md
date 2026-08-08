@@ -64,11 +64,14 @@ Drop any of those FeatureCollections straight into MapLibre / geojson.io.
 
 ### Polygon design (demo, not real council boundaries)
 
+Multi-vertex rings (not axis-aligned 4-corner boxes) so map UIs draw coastal /
+metro shapes. Schematic only — not real WCC cadastre.
+
 | Layer | Geometry intent |
 |---|---|
-| Heavy rain warning | Wellington metro box covering **both** demo points |
-| Tsunami orange zone | South-coast strip: **Lyall Bay inside**, Karori outside |
-| Coastal inundation (medium) | Slightly tighter coastal band: **Lyall only** |
+| Heavy rain warning | Multi-point Wellington metro outline covering **both** demo points |
+| Tsunami orange zone | Scalloped south-coast strip: **Lyall Bay inside**, Karori outside |
+| Coastal inundation (medium) | Tighter multi-point coastal band: **Lyall only** |
 
 ---
 

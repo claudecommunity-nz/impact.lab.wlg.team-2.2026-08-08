@@ -137,37 +137,79 @@ enum DemoScenarioData {
     )
 
     // MARK: - Demo polygons (WGS84 lng/lat) for map GeoJSON
+    //
+    // Intentionally multi-vertex (not 4-corner boxes) so map clients render as
+    // coastal / metro shapes rather than axis-aligned squares. Still schematic —
+    // not real council cadastre. Coverage rules are enforced by tests:
+    //   • warning: Lyall Bay + Karori inside
+    //   • tsunami / coastal: Lyall Bay inside, Karori outside
 
-    /// Ring helper: pairs are `(lng, lat)`.
+    /// Ring helper: pairs are `(lng, lat)`. First point should equal last (closed).
     private static func ring(_ pairs: [(Double, Double)]) -> [GeoMath.Coordinate] {
         pairs.map { GeoMath.Coordinate(lat: $0.1, lng: $0.0) }
     }
 
-    /// Covers both Lyall Bay and Karori — "same storm".
+    /// Wellington metro / ranges outline — covers both Lyall Bay and Karori ("same storm").
+    /// Clockwise coastal → harbour → hills → back to south coast.
     static let wellingtonWarningRing: [GeoMath.Coordinate] = ring([
-        (174.70, -41.36),
-        (174.86, -41.36),
-        (174.86, -41.24),
-        (174.70, -41.24),
-        (174.70, -41.36),
+        (174.705, -41.348), // Owhiro Bay / south-west
+        (174.725, -41.355), // Island Bay
+        (174.748, -41.352), // Houghton Bay
+        (174.770, -41.345), // Melrose coast
+        (174.792, -41.338), // Lyall Bay foreshore
+        (174.810, -41.328), // Rongotai / airport
+        (174.830, -41.318), // Miramar south
+        (174.845, -41.305), // Breaker Bay / Seatoun
+        (174.840, -41.290), // Miramar north
+        (174.825, -41.278), // Hataitai
+        (174.805, -41.268), // Oriental Bay / CBD
+        (174.785, -41.255), // Thorndon / Pipitea
+        (174.760, -41.248), // Ngaio hills
+        (174.735, -41.255), // Karori north ridge
+        (174.715, -41.275), // Karori west
+        (174.705, -41.300), // Makara Stream saddle
+        (174.700, -41.325), // Brooklyn / Vogeltown
+        (174.705, -41.348), // close
     ])
 
-    /// South-coast strip: contains Lyall Bay, not Karori.
+    /// South-coast tsunami orange strip: follows the shoreline with a scalloped
+    /// inland edge — contains Lyall Bay, excludes Karori (further north-west).
     static let tsunamiOrangeRing: [GeoMath.Coordinate] = ring([
-        (174.76, -41.345),
-        (174.82, -41.345),
-        (174.82, -41.312),
-        (174.76, -41.312),
-        (174.76, -41.345),
+        // Seaward edge (west → east along south coast)
+        (174.752, -41.350),
+        (174.762, -41.354),
+        (174.772, -41.352),
+        (174.782, -41.346),
+        (174.792, -41.340), // Lyall Bay beach
+        (174.802, -41.336),
+        (174.812, -41.332),
+        (174.822, -41.326),
+        (174.828, -41.320),
+        // Inland edge (east → west), north of Lyall, well south of Karori
+        (174.820, -41.314),
+        (174.808, -41.316),
+        (174.796, -41.318),
+        (174.784, -41.320),
+        (174.772, -41.324),
+        (174.762, -41.332),
+        (174.754, -41.340),
+        (174.752, -41.350), // close
     ])
 
-    /// Slightly tighter coastal band for inundation (also Lyall only).
+    /// Tighter coastal inundation band hugging Lyall Bay only (subset of tsunami strip).
     static let coastalInundationRing: [GeoMath.Coordinate] = ring([
-        (174.775, -41.340),
-        (174.815, -41.340),
-        (174.815, -41.318),
-        (174.775, -41.318),
-        (174.775, -41.340),
+        (174.778, -41.342),
+        (174.786, -41.340),
+        (174.794, -41.337),
+        (174.802, -41.334),
+        (174.808, -41.330),
+        (174.810, -41.326),
+        (174.806, -41.323),
+        (174.798, -41.324),
+        (174.790, -41.326),
+        (174.782, -41.330),
+        (174.778, -41.336),
+        (174.778, -41.342), // close
     ])
 
     // MARK: - Shared warning (covers both demo points)
