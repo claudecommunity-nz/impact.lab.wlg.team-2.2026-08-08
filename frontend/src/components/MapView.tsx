@@ -63,18 +63,20 @@ export function MapView({ center, places, armedSlot, onMapClick }: Props) {
     if (!containerRef.current || mapRef.current) return
     let cancelled = false
     const start = center ?? WELLINGTON_CBD
+    const isTouch = window.matchMedia('(pointer: coarse)').matches
     const map = new MapLibreMap({
       container: containerRef.current,
       style: STYLE_URL,
       center: [start.lng, start.lat],
       zoom: 15,
+      cooperativeGestures: isTouch,
     })
     map.addControl(new NavigationControl(), 'top-right')
     requestAnimationFrame(() => map.resize())
 
     youMarkerRef.current = new Marker({ color: '#2f2f2f' })
       .setLngLat([start.lng, start.lat])
-      .setPopup(new Popup({ offset: 16 }).setText('Approximate location'))
+      .setPopup(new Popup({ offset: 16, maxWidth: '280px' }).setText('Approximate location'))
       .addTo(map)
 
     map.on('click', (event: MapMouseEvent) => {
@@ -119,7 +121,7 @@ export function MapView({ center, places, armedSlot, onMapClick }: Props) {
       map.on('click', 'warnings-fill', (event) => {
         const props = event.features?.[0]?.properties
         if (!props) return
-        new Popup({ offset: 12 })
+        new Popup({ offset: 12, maxWidth: '280px' })
           .setLngLat(event.lngLat)
           .setHTML(
             `<strong>${props.event}</strong><br/>${[props.severity, props.urgency].filter(Boolean).join(' · ')}${
@@ -138,7 +140,7 @@ export function MapView({ center, places, armedSlot, onMapClick }: Props) {
       map.on('click', 'hubs-points', (event) => {
         const props = event.features?.[0]?.properties
         if (!props) return
-        new Popup({ offset: 12 })
+        new Popup({ offset: 12, maxWidth: '280px' })
           .setLngLat(event.lngLat)
           .setHTML(
             `<strong>${props.name}</strong>${props.type ? `<br/>${props.type}` : ''}${
@@ -197,7 +199,7 @@ export function MapView({ center, places, armedSlot, onMapClick }: Props) {
         } else {
           markersRef.current[place.id] = new Marker({ color })
             .setLngLat([place.position.lng, place.position.lat])
-            .setPopup(new Popup({ offset: 16 }).setText(place.label))
+            .setPopup(new Popup({ offset: 16, maxWidth: '280px' }).setText(place.label))
             .addTo(map)
         }
       } else if (existing) {
@@ -219,7 +221,7 @@ export function MapView({ center, places, armedSlot, onMapClick }: Props) {
       <div className="relative">
         <div
           ref={containerRef}
-          className={`h-[70vh] min-h-[420px] w-full border-y-2 ${
+          className={`h-[55dvh] min-h-[320px] w-full border-y-2 sm:h-[70dvh] ${
             armedSlot ? 'border-wcc-alert' : 'border-wcc-grey-light'
           }`}
         />

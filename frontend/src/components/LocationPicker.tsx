@@ -62,7 +62,7 @@ export function LocationPicker({
                   type="button"
                   onClick={() => onToggleVisible(place.id)}
                   title={place.visible ? 'Hide on map' : 'Show on map'}
-                  className={`rounded-full px-2 py-1 text-xs font-medium ${
+                  className={`flex min-h-[36px] min-w-[36px] items-center justify-center rounded-full px-2 py-1 text-xs font-medium ${
                     place.visible
                       ? 'bg-wcc-yellow text-wcc-charcoal'
                       : 'bg-wcc-grey-light/40 text-wcc-grey-dark'
@@ -76,7 +76,7 @@ export function LocationPicker({
                   type="button"
                   onClick={() => onRemove(place.id)}
                   title={`Remove ${place.label}`}
-                  className="rounded-full px-1.5 py-1 text-xs font-medium text-wcc-grey-dark hover:text-wcc-alert"
+                  className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded-full text-xs font-medium text-wcc-grey-dark hover:text-wcc-alert"
                 >
                   ×
                 </button>
