@@ -1,4 +1,10 @@
-import type { ConditionsEnvelope, GeoJSONFeatureCollection, WarningsEnvelope } from './types'
+import type {
+  ConditionsEnvelope,
+  DemoCatalog,
+  GeoJSONFeatureCollection,
+  LocationPicture,
+  WarningsEnvelope,
+} from './types'
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://172.20.10.3:8080'
 
@@ -51,4 +57,13 @@ export function fetchConditions(params: {
 
 export function fetchHubsGeoJSON(): Promise<GeoJSONFeatureCollection> {
   return getJSON<GeoJSONFeatureCollection>('/v1/hubs?format=geojson')
+}
+
+export function fetchDemoScenarios(): Promise<DemoCatalog> {
+  return getJSON<DemoCatalog>('/v1/demo/scenarios')
+}
+
+export function fetchDemoPicture(params: { scenario: string; point: string }): Promise<LocationPicture> {
+  const qs = new URLSearchParams({ scenario: params.scenario, point: params.point })
+  return getJSON<LocationPicture>(`/v1/demo/picture?${qs}`)
 }

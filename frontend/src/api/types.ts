@@ -102,3 +102,87 @@ export interface GeoJSONFeatureCollection {
     properties: Record<string, unknown>
   }>
 }
+
+export interface DemoPointInfo {
+  id: string
+  name: string
+  lat: number
+  lng: number
+}
+
+export interface DemoScenarioInfo {
+  id: string
+  title: string
+  description: string
+  points: DemoPointInfo[]
+}
+
+export interface DemoCatalog {
+  note: string
+  scenarios: DemoScenarioInfo[]
+}
+
+export interface HazardItem {
+  layer: string
+  id: string
+  value: string
+  detail: string | null
+  publisher: string
+  source: SourceMeta
+}
+
+export interface HazardsEnvelope {
+  status: string
+  note: string
+  items: HazardItem[]
+}
+
+export interface NearestHub {
+  id: number
+  name: string
+  type: string | null
+  address: string | null
+  suburb: string | null
+  town: string | null
+  lat: number
+  lng: number
+  distanceKm: number
+  source: SourceMeta
+}
+
+export interface PictureLocation {
+  lat: number
+  lng: number
+  nearestHub: NearestHub | null
+}
+
+export interface OfficialWarningsSection {
+  status: string
+  items: Warning[]
+  reason: string | null
+}
+
+export interface LocalConditionsSection {
+  status: string
+  gauges: GaugeReading[]
+  electricityOutages: ElectricityOutage[]
+  waterFaults: WaterFault[]
+  reason: string | null
+}
+
+export interface SourceStatusEntry {
+  id: string
+  fetchedAt: string | null
+  status: string
+}
+
+export interface LocationPicture {
+  location: PictureLocation
+  officialWarnings: OfficialWarningsSection
+  localConditions: LocalConditionsSection
+  hazardContext: HazardsEnvelope
+  summary: string[]
+  generatedAt: string
+  sources: SourceStatusEntry[]
+  disclaimer: string
+}
