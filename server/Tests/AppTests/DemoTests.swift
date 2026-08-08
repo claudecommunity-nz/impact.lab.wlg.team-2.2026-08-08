@@ -116,4 +116,95 @@ struct DemoTests {
             }
         }
     }
+
+    @Test("Demo polygons: warning covers both points; tsunami only Lyall Bay")
+    func demoPolygonCoverage() {
+        let lyall = GeoMath.Coordinate(lat: -41.3286, lng: 174.7947)
+        let karori = GeoMath.Coordinate(lat: -41.2865, lng: 174.7405)
+
+        #expect(GeoMath.pointInPolygon(point: lyall, ring: DemoScenarioData.wellingtonWarningRing))
+        #expect(GeoMath.pointInPolygon(point: karori, ring: DemoScenarioData.wellingtonWarningRing))
+        #expect(GeoMath.pointInPolygon(point: lyall, ring: DemoScenarioData.tsunamiOrangeRing))
+        #expect(!GeoMath.pointInPolygon(point: karori, ring: DemoScenarioData.tsunamiOrangeRing))
+        #expect(GeoMath.pointInPolygon(point: lyall, ring: DemoScenarioData.coastalInundationRing))
+        #expect(!GeoMath.pointInPolygon(point: karori, ring: DemoScenarioData.coastalInundationRing))
+    }
+
+    @Test("Demo warnings GeoJSON has Polygon geometry for both points")
+    func warningsGeoJSON() async throws {
+        try await withApp(configure: configure) { app in
+            for point in ["lyall-bay", "karori"] {
+                try await app.testing().test(
+                    .GET,
+                    "v1/demo/warnings?scenario=southerly-storm&point=\(point)&format=geojson"
+                ) { res async throws in
+                    #expect(res.status == .ok)
+                    let body = try res.content.decode(
+                        GeoJSONPolygonFeatureCollection<WarningGeoJSONProperties>.self
+                    )
+                    #expect(body.type == "FeatureCollection")
+                    #expect(body.features.count == 1)
+                    #expect(body.features[0].geometry.type == "Polygon")
+                    #expect(!body.features[0].geometry.coordinates.isEmpty)
+                    #expect(body.features[0].properties.event == "rain")
+                }
+            }
+        }
+    }
+
+    @Test("Demo hazards GeoJSON: Lyall has polygons, Karori empty")
+    func hazardsGeoJSON() async throws {
+        try await withApp(configure: configure) { app in
+            try await app.testing().test(
+                .GET,
+                "v1/demo/hazards?scenario=southerly-storm&point=lyall-bay&format=geojson"
+            ) { res async throws in
+                #expect(res.status == .ok)
+                let body = try res.content.decode(
+                    GeoJSONPolygonFeatureCollection<HazardGeoJSONProperties>.self
+                )
+                #expect(body.features.count >= 2)
+                for f in body.features {
+                    #expect(f.geometry.type == "Polygon")
+                }
+                let ids = Set(body.features.map(\.properties.id))
+                #expect(ids.contains("tsunami-evacuation-zones"))
+                #expect(ids.contains("coastal-inundation-medium"))
+            }
+
+            try await app.testing().test(
+                .GET,
+                "v1/demo/hazards?scenario=southerly-storm&point=karori&format=geojson"
+            ) { res async throws in
+                #expect(res.status == .ok)
+                let body = try res.content.decode(
+                    GeoJSONPolygonFeatureCollection<HazardGeoJSONProperties>.self
+                )
+                #expect(body.features.isEmpty)
+            }
+        }
+    }
+
+    @Test("Demo conditions GeoJSON has Point features")
+    func conditionsGeoJSON() async throws {
+        try await withApp(configure: configure) { app in
+            try await app.testing().test(
+                .GET,
+                "v1/demo/conditions?scenario=southerly-storm&point=lyall-bay&format=geojson"
+            ) { res async throws in
+                #expect(res.status == .ok)
+                let body = try res.content.decode(
+                    GeoJSONFeatureCollection<DemoConditionPointProperties>.self
+                )
+                #expect(body.features.count >= 3)
+                for f in body.features {
+                    #expect(f.geometry.type == "Point")
+                    #expect(f.geometry.coordinates.count == 2)
+                }
+                let kinds = Set(body.features.map(\.properties.kind))
+                #expect(kinds.contains("gauge"))
+                #expect(kinds.contains("hub"))
+            }
+        }
+    }
 }

@@ -138,22 +138,85 @@ func routes(_ app: Application) throws {
         return try req.services.demo.picture(scenarioId: scenario, pointId: point)
     }
 
-    demo.get("warnings") { req -> OfficialWarningsSection in
+    // Warnings JSON or polygon GeoJSON for the map
+    demo.get("warnings") { req -> Response in
         let scenario = try req.query.get(String.self, at: "scenario")
         let point = try req.query.get(String.self, at: "point")
-        return try req.services.demo.warnings(scenarioId: scenario, pointId: point)
+        let format = (req.query[String.self, at: "format"] ?? "json").lowercased()
+        let records = try req.services.demo.warningRecords(scenarioId: scenario, pointId: point)
+
+        if format == "geojson" {
+            let collection = GeoJSONPolygonFeatureCollection(
+                features: records.map { $0.asGeoJSONFeature() }
+            )
+            let response = Response(status: .ok)
+            try response.content.encode(collection, as: .json)
+            return response
+        }
+
+        let section = OfficialWarningsSection.ok(records.map(\.warning))
+        let response = Response(status: .ok)
+        try response.content.encode(section, as: .json)
+        return response
     }
 
-    demo.get("conditions") { req -> LocalConditionsSection in
+    // Conditions JSON or point GeoJSON (gauges / outages / water / hub pins)
+    demo.get("conditions") { req -> Response in
         let scenario = try req.query.get(String.self, at: "scenario")
         let point = try req.query.get(String.self, at: "point")
-        return try req.services.demo.conditions(scenarioId: scenario, pointId: point)
+        let format = (req.query[String.self, at: "format"] ?? "json").lowercased()
+
+        if format == "geojson" {
+            let features = try req.services.demo.conditionPointFeatures(
+                scenarioId: scenario,
+                pointId: point
+            )
+            let collection = GeoJSONFeatureCollection(features: features)
+            let response = Response(status: .ok)
+            try response.content.encode(collection, as: .json)
+            return response
+        }
+
+        let section = try req.services.demo.conditions(scenarioId: scenario, pointId: point)
+        let response = Response(status: .ok)
+        try response.content.encode(section, as: .json)
+        return response
     }
 
-    demo.get("hazards") { req -> HazardsEnvelope in
+    // Hazards JSON or polygon GeoJSON (planning zones for the map)
+    demo.get("hazards") { req -> Response in
         let scenario = try req.query.get(String.self, at: "scenario")
         let point = try req.query.get(String.self, at: "point")
-        return try req.services.demo.hazards(scenarioId: scenario, pointId: point)
+        let format = (req.query[String.self, at: "format"] ?? "json").lowercased()
+
+        if format == "geojson" {
+            let polygons = try req.services.demo.hazardPolygons(
+                scenarioId: scenario,
+                pointId: point
+            )
+            let features: [GeoJSONPolygonFeature<HazardGeoJSONProperties>] = polygons.map { pair in
+                GeoJSONPolygonFeature(
+                    geometry: .from(rings: pair.rings),
+                    properties: HazardGeoJSONProperties(
+                        id: pair.item.id,
+                        layer: pair.item.layer,
+                        value: pair.item.value,
+                        detail: pair.item.detail,
+                        publisher: pair.item.publisher,
+                        sourceId: pair.item.source.id
+                    )
+                )
+            }
+            let collection = GeoJSONPolygonFeatureCollection(features: features)
+            let response = Response(status: .ok)
+            try response.content.encode(collection, as: .json)
+            return response
+        }
+
+        let section = try req.services.demo.hazards(scenarioId: scenario, pointId: point)
+        let response = Response(status: .ok)
+        try response.content.encode(section, as: .json)
+        return response
     }
 }
 

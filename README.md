@@ -41,10 +41,14 @@ Curated scenarios — **not** live feeds:
 curl -s localhost:8080/v1/demo/scenarios | jq .
 curl -s 'localhost:8080/v1/demo/picture?scenario=southerly-storm&point=lyall-bay' | jq .summary
 curl -s 'localhost:8080/v1/demo/picture?scenario=southerly-storm&point=karori' | jq .summary
+
+# Map layers (GeoJSON polygons + pins)
+curl -s 'localhost:8080/v1/demo/warnings?scenario=southerly-storm&point=lyall-bay&format=geojson'
+curl -s 'localhost:8080/v1/demo/hazards?scenario=southerly-storm&point=lyall-bay&format=geojson'
+curl -s 'localhost:8080/v1/demo/conditions?scenario=southerly-storm&point=lyall-bay&format=geojson'
 ```
 
 Details: [`docs/07-demo-data.md`](docs/07-demo-data.md).
-
 **Demo anchors:** Lyall Bay `-41.3286, 174.7947` · Karori `-41.2865, 174.7405`.
 
 ---

@@ -134,3 +134,22 @@ extension WarningRecord {
         )
     }
 }
+
+// MARK: - Hazard / condition GeoJSON (demo map layers)
+
+struct HazardGeoJSONProperties: Codable, Sendable {
+    let id: String
+    let layer: String
+    let value: String
+    let detail: String?
+    let publisher: String
+    let sourceId: String
+}
+
+struct DemoConditionPointProperties: Codable, Sendable {
+    /// `gauge` | `outage` | `water` | `hub`
+    let kind: String
+    let label: String
+    let detail: String?
+    let sourceId: String
+}

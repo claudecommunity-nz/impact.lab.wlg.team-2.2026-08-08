@@ -1,10 +1,9 @@
 # Demo data & endpoints
 
 **Live** feeds stay under `/v1/*`. **Curated mock** data lives under `/v1/demo/*`
-so judges and teammates never confuse staged scenarios with production GIS.
+so judges never confuse staged scenarios with production GIS.
 
-Mock scenarios are defined in code (`server/Sources/App/Demo/`), not checked-in
-JSON dumps. Live capture dumps from `scripts/test-snapshot.sh` are **gitignored**.
+Mock scenarios are defined in code (`server/Sources/App/Demo/`).
 
 ---
 
@@ -12,69 +11,79 @@ JSON dumps. Live capture dumps from `scripts/test-snapshot.sh` are **gitignored*
 
 ```bash
 cd server && swift run App
-# Base: http://localhost:8080  (or LAN IP logged at boot)
 
 curl -s localhost:8080/v1/demo/scenarios | jq .
-curl -s 'localhost:8080/v1/demo/picture?scenario=southerly-storm&point=lyall-bay' | jq .
-curl -s 'localhost:8080/v1/demo/picture?scenario=southerly-storm&point=karori' | jq .
+curl -s 'localhost:8080/v1/demo/picture?scenario=southerly-storm&point=lyall-bay' | jq .summary
 ```
+
+### Map layers (GeoJSON — key for presentation)
+
+```bash
+# Same storm polygon at both points
+curl -s 'localhost:8080/v1/demo/warnings?scenario=southerly-storm&point=lyall-bay&format=geojson' | jq .
+curl -s 'localhost:8080/v1/demo/warnings?scenario=southerly-storm&point=karori&format=geojson' | jq .
+
+# Planning polygons: Lyall Bay has tsunami + coastal; Karori has none
+curl -s 'localhost:8080/v1/demo/hazards?scenario=southerly-storm&point=lyall-bay&format=geojson' | jq '{n:(.features|length), ids:[.features[].properties.id]}'
+curl -s 'localhost:8080/v1/demo/hazards?scenario=southerly-storm&point=karori&format=geojson' | jq '.features|length'
+
+# Pins: gauges, outages, water faults, nearest hub
+curl -s 'localhost:8080/v1/demo/conditions?scenario=southerly-storm&point=lyall-bay&format=geojson' | jq '{n:(.features|length), kinds:[.features[].properties.kind]}'
+```
+
+Drop any of those FeatureCollections straight into MapLibre / geojson.io.
 
 ---
 
 ## Demo endpoints
 
-| Method | Path | Params | Returns |
-|---|---|---|---|
-| GET | `/v1/demo/scenarios` | — | Catalogue: scenario ids, titles, descriptions, fixed points |
-| GET | `/v1/demo/picture` | `scenario`, `point` | Full `LocationPicture` (same shape as live `/v1/picture`) |
-| GET | `/v1/demo/warnings` | `scenario`, `point` | `officialWarnings` section only |
-| GET | `/v1/demo/conditions` | `scenario`, `point` | `localConditions` section only |
-| GET | `/v1/demo/hazards` | `scenario`, `point` | `hazardContext` section only |
-
-Unknown `scenario` / `point` → **404**. Missing params → **400**.
-
-### Points (both scenarios)
-
-| `point` | Place | Coordinates |
+| Path | Params | Returns |
 |---|---|---|
-| `lyall-bay` | Lyall Bay (coast) | `-41.3286, 174.7947` |
-| `karori` | Karori (hill) | `-41.2865, 174.7405` |
+| `/v1/demo/scenarios` | — | Catalogue |
+| `/v1/demo/picture` | `scenario`, `point` | Full `LocationPicture` |
+| `/v1/demo/warnings` | `scenario`, `point`, `format?` | JSON section **or** **Polygon** GeoJSON |
+| `/v1/demo/conditions` | `scenario`, `point`, `format?` | JSON section **or** **Point** GeoJSON |
+| `/v1/demo/hazards` | `scenario`, `point`, `format?` | JSON section **or** **Polygon** GeoJSON |
+
+`format=geojson` (default `json`). Unknown scenario/point → **404**.
+
+### Points
+
+| `point` | Place | Coords |
+|---|---|---|
+| `lyall-bay` | Lyall Bay | `-41.3286, 174.7947` |
+| `karori` | Karori | `-41.2865, 174.7405` |
 
 ### Scenarios
 
 | `scenario` | Intent |
 |---|---|
-| **`southerly-storm`** | **Main demo.** Same Heavy Rain Warning at both points; Lyall Bay has tsunami + coastal planning layers, rising rain, Kilbirnie outage, water faults; Karori has elevated stream stage and different faults, **no** tsunami zone. “Same storm, different street.” |
-| **`calm-day`** | Honest empty warnings + light gauges; planning contrast still holds. Mirrors a quiet live day. |
-| **`degraded`** | Conditions section `status: "unavailable"` with a simulated reason (e.g. Hilltop timeout **(demo)**). Warnings/hazards still present — partial picture, HTTP 200. **Not a real upstream outage.** |
+| **`southerly-storm`** | Same Heavy Rain Warning polygon at both points; Lyall has tsunami + coastal **polygons** + pins; Karori has warning only (no coastal polygons), different pins. |
+| **`calm-day`** | No warnings; planning polygons still differ by point. |
+| **`degraded`** | Conditions unavailable; warnings (with polygon) + hazards still present. |
 
-Field names, `source` / `trust` / `fetchedAt`, `summary[]`, and `disclaimer` match the live contract in `02-api-contract.md`.
+### Polygon design (demo, not real council boundaries)
+
+| Layer | Geometry intent |
+|---|---|
+| Heavy rain warning | Wellington metro box covering **both** demo points |
+| Tsunami orange zone | South-coast strip: **Lyall Bay inside**, Karori outside |
+| Coastal inundation (medium) | Slightly tighter coastal band: **Lyall only** |
 
 ---
 
 ## Live API (unchanged)
 
-| Path | Role |
-|---|---|
-| `/healthz` | Liveness |
-| `/v1/hubs` | Real WREMO hubs |
-| `/v1/warnings` | Real CAP warnings |
-| `/v1/conditions` | Real gauges / outages / water |
-| `/v1/hazards` | Real planning layers |
-| `/v1/picture` | Live fan-out join |
-
-Use live for integrity checks; use **`/v1/demo/*`** for the 4‑minute pitch when the weather is calm.
+`/healthz`, `/v1/hubs`, `/v1/warnings`, `/v1/conditions`, `/v1/hazards`, `/v1/picture`  
+Hubs GeoJSON: `/v1/hubs?format=geojson` (real WREMO points).
 
 ---
 
-## Where the mock data lives
+## Code
 
 ```
 server/Sources/App/Demo/
   DemoModels.swift
-  DemoScenarioData.swift   # scenario payloads (Swift, curated)
+  DemoScenarioData.swift   # scenarios + rings
   DemoService.swift
 ```
-
-Edit `DemoScenarioData.swift` to tweak stories. Summary language stays factual
-(no advice words).

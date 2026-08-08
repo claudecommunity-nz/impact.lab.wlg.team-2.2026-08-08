@@ -136,6 +136,40 @@ enum DemoScenarioData {
         age: 210
     )
 
+    // MARK: - Demo polygons (WGS84 lng/lat) for map GeoJSON
+
+    /// Ring helper: pairs are `(lng, lat)`.
+    private static func ring(_ pairs: [(Double, Double)]) -> [GeoMath.Coordinate] {
+        pairs.map { GeoMath.Coordinate(lat: $0.1, lng: $0.0) }
+    }
+
+    /// Covers both Lyall Bay and Karori — "same storm".
+    static let wellingtonWarningRing: [GeoMath.Coordinate] = ring([
+        (174.70, -41.36),
+        (174.86, -41.36),
+        (174.86, -41.24),
+        (174.70, -41.24),
+        (174.70, -41.36),
+    ])
+
+    /// South-coast strip: contains Lyall Bay, not Karori.
+    static let tsunamiOrangeRing: [GeoMath.Coordinate] = ring([
+        (174.76, -41.345),
+        (174.82, -41.345),
+        (174.82, -41.312),
+        (174.76, -41.312),
+        (174.76, -41.345),
+    ])
+
+    /// Slightly tighter coastal band for inundation (also Lyall only).
+    static let coastalInundationRing: [GeoMath.Coordinate] = ring([
+        (174.775, -41.340),
+        (174.815, -41.340),
+        (174.815, -41.318),
+        (174.775, -41.318),
+        (174.775, -41.340),
+    ])
+
     // MARK: - Shared warning (covers both demo points)
 
     private static func wellingtonHeavyRain() -> Warning {
@@ -154,6 +188,51 @@ enum DemoScenarioData {
             web: "https://metservice.com/warnings/home",
             source: metSource
         )
+    }
+
+    private static func wellingtonHeavyRainRecord() -> WarningRecord {
+        WarningRecord(warning: wellingtonHeavyRain(), rings: [wellingtonWarningRing])
+    }
+
+    /// Warning polygons for map (`?format=geojson`). Filtered to those covering the point.
+    static func warningRecords(
+        scenario: ScenarioID,
+        point: PointID
+    ) -> [WarningRecord] {
+        let coord = GeoMath.Coordinate(lat: point.lat, lng: point.lng)
+        switch scenario {
+        case .southerlyStorm, .degraded:
+            let record = wellingtonHeavyRainRecord()
+            return record.covers(coord) ? [record] : []
+        case .calmDay:
+            return []
+        }
+    }
+
+    /// Hazard polygons for map. Lyall Bay has tsunami + coastal; Karori has none.
+    static func hazardPolygons(
+        scenario: ScenarioID,
+        point: PointID
+    ) -> [(item: HazardItem, rings: [[GeoMath.Coordinate]])] {
+        // Calm / storm / degraded all keep the same planning contrast for the two points.
+        switch point {
+        case .lyallBay:
+            let items = lyallHazards().items
+            var out: [(HazardItem, [[GeoMath.Coordinate]])] = []
+            for item in items {
+                switch item.id {
+                case "tsunami-evacuation-zones":
+                    out.append((item, [tsunamiOrangeRing]))
+                case "coastal-inundation-medium":
+                    out.append((item, [coastalInundationRing]))
+                default:
+                    break
+                }
+            }
+            return out
+        case .karori:
+            return []
+        }
     }
 
     // MARK: - Hubs
@@ -467,13 +546,13 @@ enum DemoScenarioData {
 
         switch scenario {
         case .southerlyStorm:
-            warnings = .ok([wellingtonHeavyRain()])
+            warnings = .ok(warningRecords(scenario: scenario, point: point).map(\.warning))
             conditions = point == .lyallBay ? lyallStormConditions() : karoriStormConditions()
         case .calmDay:
             warnings = .ok([])
             conditions = point == .lyallBay ? lyallCalmConditions() : karoriCalmConditions()
         case .degraded:
-            warnings = .ok([wellingtonHeavyRain()])
+            warnings = .ok(warningRecords(scenario: scenario, point: point).map(\.warning))
             conditions = .unavailable("hilltop.gw.govt.nz timed out (demo)")
         }
 
