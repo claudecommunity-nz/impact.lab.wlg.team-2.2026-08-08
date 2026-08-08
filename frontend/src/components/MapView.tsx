@@ -1,10 +1,33 @@
+/// <reference types="geojson" />
 import { useEffect, useRef } from 'react'
-import { Map as MapLibreMap, Marker, NavigationControl, Popup, type MapMouseEvent } from 'maplibre-gl'
+import {
+  Map as MapLibreMap,
+  Marker,
+  NavigationControl,
+  Popup,
+  type GeoJSONSource,
+  type MapMouseEvent,
+} from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import '../lib/maplibreWorker'
+import { WELLINGTON_CBD } from '../constants'
+import { useWarningsOverlay } from '../hooks/useWarningsOverlay'
+import { useHubsOverlay } from '../hooks/useHubsOverlay'
 import type { LatLng, Place } from '../types'
 
-const WELLINGTON_CBD: LatLng = { lat: -41.2865, lng: 174.7762 }
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
+
+const SEVERITY_COLOR_EXPRESSION = [
+  'match',
+  ['downcase', ['coalesce', ['get', 'severity'], 'unknown']],
+  'extreme',
+  '#f07000',
+  'severe',
+  '#f07000',
+  'moderate',
+  '#ffdd00',
+  '#949494',
+] as const
 
 const HOME_COLOR = '#ffdd00'
 const PLACE_COLORS = ['#0057a8', '#f07000', '#2f2f2f', '#595959']
@@ -29,8 +52,16 @@ export function MapView({ center, places, armedSlot, onMapClick }: Props) {
   const onMapClickRef = useRef(onMapClick)
   onMapClickRef.current = onMapClick
 
+  const { data: warningsGeoJSON } = useWarningsOverlay()
+  const { data: hubsGeoJSON } = useHubsOverlay()
+  const warningsDataRef = useRef(warningsGeoJSON)
+  warningsDataRef.current = warningsGeoJSON
+  const hubsDataRef = useRef(hubsGeoJSON)
+  hubsDataRef.current = hubsGeoJSON
+
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
+    let cancelled = false
     const start = center ?? WELLINGTON_CBD
     const map = new MapLibreMap({
       container: containerRef.current,
@@ -50,8 +81,83 @@ export function MapView({ center, places, armedSlot, onMapClick }: Props) {
       onMapClickRef.current({ lat: event.lngLat.lat, lng: event.lngLat.lng })
     })
 
+    map.on('load', () => {
+      if (cancelled) return
+      map.addSource('warnings', {
+        type: 'geojson',
+        data: warningsDataRef.current as unknown as GeoJSON.FeatureCollection,
+      })
+      map.addLayer({
+        id: 'warnings-fill',
+        type: 'fill',
+        source: 'warnings',
+        paint: { 'fill-color': SEVERITY_COLOR_EXPRESSION as unknown as string, 'fill-opacity': 0.25 },
+      })
+      map.addLayer({
+        id: 'warnings-outline',
+        type: 'line',
+        source: 'warnings',
+        paint: { 'line-color': SEVERITY_COLOR_EXPRESSION as unknown as string, 'line-width': 2, 'line-opacity': 0.7 },
+      })
+
+      map.addSource('hubs', {
+        type: 'geojson',
+        data: hubsDataRef.current as unknown as GeoJSON.FeatureCollection,
+      })
+      map.addLayer({
+        id: 'hubs-points',
+        type: 'circle',
+        source: 'hubs',
+        paint: {
+          'circle-radius': 5,
+          'circle-color': '#0057a8',
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': '#ffffff',
+        },
+      })
+
+      map.on('click', 'warnings-fill', (event) => {
+        const props = event.features?.[0]?.properties
+        if (!props) return
+        new Popup({ offset: 12 })
+          .setLngLat(event.lngLat)
+          .setHTML(
+            `<strong>${props.event}</strong><br/>${[props.severity, props.urgency].filter(Boolean).join(' · ')}${
+              props.areaDesc ? `<br/>${props.areaDesc}` : ''
+            }`,
+          )
+          .addTo(map)
+      })
+      map.on('mouseenter', 'warnings-fill', () => {
+        map.getCanvas().style.cursor = 'pointer'
+      })
+      map.on('mouseleave', 'warnings-fill', () => {
+        map.getCanvas().style.cursor = ''
+      })
+
+      map.on('click', 'hubs-points', (event) => {
+        const props = event.features?.[0]?.properties
+        if (!props) return
+        new Popup({ offset: 12 })
+          .setLngLat(event.lngLat)
+          .setHTML(
+            `<strong>${props.name}</strong>${props.type ? `<br/>${props.type}` : ''}${
+              props.address ? `<br/>${props.address}` : ''
+            }`,
+          )
+          .addTo(map)
+      })
+      map.on('mouseenter', 'hubs-points', () => {
+        map.getCanvas().style.cursor = 'pointer'
+      })
+      map.on('mouseleave', 'hubs-points', () => {
+        map.getCanvas().style.cursor = ''
+      })
+    })
+
     mapRef.current = map
     return () => {
+      cancelled = true
       map.remove()
       mapRef.current = null
     }
@@ -64,6 +170,16 @@ export function MapView({ center, places, armedSlot, onMapClick }: Props) {
     mapRef.current.flyTo({ center: [center.lng, center.lat], zoom: 15 })
     youMarkerRef.current?.setLngLat([center.lng, center.lat])
   }, [center])
+
+  useEffect(() => {
+    const source = mapRef.current?.getSource('warnings') as GeoJSONSource | undefined
+    source?.setData(warningsGeoJSON as unknown as GeoJSON.FeatureCollection)
+  }, [warningsGeoJSON])
+
+  useEffect(() => {
+    const source = mapRef.current?.getSource('hubs') as GeoJSONSource | undefined
+    source?.setData(hubsGeoJSON as unknown as GeoJSON.FeatureCollection)
+  }, [hubsGeoJSON])
 
   useEffect(() => {
     const map = mapRef.current

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Header } from './components/Header'
-import { PrivateAlerts } from './components/PrivateAlerts'
+import { StatusBlock } from './components/StatusBlock'
+import { LiveConditions } from './components/LiveConditions'
 import { LocationPicker } from './components/LocationPicker'
 import { MapView } from './components/MapView'
 import { RegionalWarnings } from './components/RegionalWarnings'
@@ -30,7 +31,8 @@ function App() {
   return (
     <div className="min-h-screen bg-wcc-white pb-8">
       <Header />
-      <PrivateAlerts locationStatus={status} />
+      <StatusBlock position={position} locationStatus={status} />
+      <LiveConditions position={position} locationStatus={status} />
       <LocationPicker
         places={places}
         armedSlot={armedSlot}
