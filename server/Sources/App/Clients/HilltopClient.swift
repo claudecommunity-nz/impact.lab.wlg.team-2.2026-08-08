@@ -140,6 +140,8 @@ actor HilltopClient {
     // MARK: - XML helpers
 
     private func parseXML(_ data: Data) throws -> XMLElement {
+        // Portability: XMLDocument is the second Apple-leaning call site.
+        // On Linux use FoundationXML (libxml2) or fall back to XMLParser (see README).
         let doc = try XMLDocument(data: data, options: [.documentTidyXML])
         guard let root = doc.rootElement() else {
             throw Abort(.badGateway, reason: "Hilltop returned empty XML")

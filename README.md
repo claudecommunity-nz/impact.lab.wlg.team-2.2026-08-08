@@ -1,12 +1,14 @@
 # Impact Lab Wellington: Team 2
 
-**Location Picture** is a local Swift/Vapor API that answers: *what does this weather event mean here?*
+**Location Picture** is a **local open-source Swift (Vapor) API** that answers: *what does this weather event mean here?*
 
 Joins official CAP warnings, live conditions (gauges, electricity, water), and planning hazard layers for any lat/lng. Every fact carries `source` + `fetchedAt`. Information, not advice.
 
 Wellington City Council Emergency Management × Claude Code Community NZ · 8 Aug 2026.
 
 📹 **Demo video:** [Google Drive](https://drive.google.com/file/d/1trHzgpqLnAodt4HEovSwfTH9EoDUtCO1/view?usp=sharing) · 🖥 **Presentation:** [Google Slides](https://docs.google.com/presentation/d/1wclUhLOtDxCCHf1c-qu6v3hQkcyPwOPF/edit?usp=sharing)
+
+**Not an Apple-native service.** The server is ~2,600 lines of open-source Swift on Vapor/SwiftNIO — same stack you can run on Linux. The Impact Lab day demo was built on macOS; hosting is not locked to Apple hardware, the Xcode UI, or proprietary Apple frameworks.
 
 ---
 
@@ -18,17 +20,37 @@ swift run App
 # http://127.0.0.1:8080  (also binds LAN; see boot log)
 ```
 
-Requires Swift 6 + macOS. Override bind with `HOST=` / `PORT=`.
+Requires a **Swift 6** toolchain (open-source `swift.org` or Xcode’s Swift). Override bind with `HOST=` / `PORT=`.  
 Tests: `cd server && swift test` (GeoMath suite is offline; Hubs/Warnings hit live endpoints).
 
 ### Frontend (branch `2-frontend`)
 
-Vite + React + MapLibre web UI, kept on its own branch:
+Vite + React + MapLibre web UI (also open source — no Apple runtime):
 
 ```bash
 git checkout 2-frontend
 cd frontend && npm install && npm run dev   # http://localhost:5173, expects API on :8080
 ```
+
+---
+
+## Platform & portability
+
+| | |
+|---|---|
+| **Server language / framework** | Open-source **Swift 6** + **Vapor 4** (SwiftNIO, swift-log) |
+| **Imports in app code** | Essentially **Foundation**, **Vapor**, **Logging** only |
+| **Not used on the server** | MapKit, CoreLocation, SwiftUI, Metal, SwiftData — deliberate (this is an API, not an iOS app) |
+| **Licence** | **AGPL-3.0-or-later** — open source end to end |
+| **SPM `platforms: [.macOS(.v13)]`** | Apple *minimum* for local SPM resolution — **not** “Linux forbidden” |
+| **Frontend** | Vite / React / MapLibre |
+
+**Two small Apple-leaning call sites** (everything else is portable as-is):
+
+1. **`Darwin.bind`** in `configure.swift` — free-port probe for LAN bind. On Linux use `Glibc.bind` behind `#if canImport(Darwin)`.
+2. **`XMLDocument`** in `HilltopClient` — Hilltop XML parse. On Linux: FoundationXML (libxml2) or fall back to `XMLParser`.
+
+Honest one-liner: *~2,600 lines of server code, two Apple-specific call sites, open licence and open toolchain — roughly half an hour from a stock `swift:6.0` Docker image on a council Linux box once those two sites are conditional. No vendor lock-in on the OS, the toolchain, the framework, or the licence.*
 
 ---
 
@@ -60,7 +82,7 @@ curl -s 'localhost:8080/v1/demo/hazards?scenario=southerly-storm&point=lyall-bay
 curl -s 'localhost:8080/v1/demo/conditions?scenario=southerly-storm&point=lyall-bay&format=geojson'
 ```
 
-Details: [`docs/07-demo-data.md`](docs/07-demo-data.md).
+Details: [`docs/07-demo-data.md`](docs/07-demo-data.md).  
 **Demo anchors:** Lyall Bay `-41.3286, 174.7947` · Karori `-41.2865, 174.7405`.
 
 ---
@@ -82,7 +104,8 @@ https://github.com/claudecommunity-nz/wcc-emergency-gis-data
 ## Layout
 
 ```
-server/     Vapor app (Sources, Tests)
+server/     Vapor app (Sources, Tests) — open-source Swift API
+frontend/   Vite + React + MapLibre (branch 2-frontend)
 docs/       API contract + demo data notes
 LICENSE     AGPL-3.0-or-later
 ```
@@ -102,6 +125,8 @@ LICENSE     AGPL-3.0-or-later
 - 4 of ~15 relevant planning layers wired; each additional layer is one URL +
   label in `HazardsService`.
 - No community reports yet; the `trust` field reserves `community-unverified`.
+- Linux packaging (conditional `bind` / FoundationXML) is documented above but
+  not landed in this lab snapshot; day-of demo used the macOS toolchain.
 
 ---
 

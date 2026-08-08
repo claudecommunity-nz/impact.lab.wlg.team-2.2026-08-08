@@ -97,6 +97,8 @@ private func isPortAvailable(_ port: Int, hostname: String) -> Bool {
         addr.sin_addr = in_addr(s_addr: INADDR_ANY.bigEndian)
     }
 
+    // Portability: Darwin.bind is the one Apple-only socket call in this probe.
+    // On Linux use Glibc.bind behind `#if canImport(Darwin)` (see README).
     let bound = withUnsafePointer(to: &addr) { ptr in
         ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
             Darwin.bind(fd, sa, socklen_t(MemoryLayout<sockaddr_in>.size))
