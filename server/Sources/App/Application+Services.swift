@@ -5,8 +5,10 @@ import Vapor
 struct AppServices: Sendable {
     let cache: SourceCache
     let arcgis: ArcGISClient
+    let hilltop: HilltopClient
     let hubs: HubsService
     let warnings: WarningsService
+    let conditions: ConditionsService
 }
 
 enum AppServicesKey: StorageKey {
@@ -27,9 +29,23 @@ extension Application {
     func setupServices() {
         let cache = SourceCache()
         let arcgis = ArcGISClient(client: client, logger: logger)
+        let hilltop = HilltopClient(client: client, logger: logger)
         let hubs = HubsService(arcgis: arcgis, cache: cache)
         let warnings = WarningsService(arcgis: arcgis, cache: cache, logger: logger)
-        services = AppServices(cache: cache, arcgis: arcgis, hubs: hubs, warnings: warnings)
+        let conditions = ConditionsService(
+            hilltop: hilltop,
+            arcgis: arcgis,
+            cache: cache,
+            logger: logger
+        )
+        services = AppServices(
+            cache: cache,
+            arcgis: arcgis,
+            hilltop: hilltop,
+            hubs: hubs,
+            warnings: warnings,
+            conditions: conditions
+        )
     }
 }
 

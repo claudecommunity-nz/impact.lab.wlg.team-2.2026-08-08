@@ -71,6 +71,29 @@ func routes(_ app: Application) throws {
         try response.content.encode(envelope, as: .json)
         return response
     }
+
+    // G3 — live local conditions (gauges, outages, water faults)
+    v1.get("conditions") { req -> ConditionsEnvelope in
+        guard let lat = req.query[Double.self, at: "lat"],
+              let lng = req.query[Double.self, at: "lng"]
+        else {
+            throw Abort(.badRequest, reason: "lat and lng are required")
+        }
+        let n = req.query[Int.self, at: "n"] ?? 5
+        let radiusKm = req.query[Double.self, at: "radiusKm"] ?? 10
+        guard n > 0, n <= 20 else {
+            throw Abort(.badRequest, reason: "n must be 1…20")
+        }
+        guard radiusKm > 0, radiusKm <= 100 else {
+            throw Abort(.badRequest, reason: "radiusKm must be 0…100")
+        }
+
+        return try await req.services.conditions.conditions(
+            at: .init(lat: lat, lng: lng),
+            n: n,
+            radiusKm: radiusKm
+        )
+    }
 }
 
 struct HealthzResponse: Content {
