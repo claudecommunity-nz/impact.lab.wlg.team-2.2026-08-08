@@ -6,7 +6,7 @@ Joins official CAP warnings, live conditions (gauges, electricity, water), and p
 
 Wellington City Council Emergency Management × Claude Code Community NZ · 8 Aug 2026.
 
-🖥 **Presentation:** [Google Slides](https://docs.google.com/presentation/d/1wclUhLOtDxCCHf1c-qu6v3hQkcyPwOPF/edit?usp=sharing)
+📹 **Demo video:** [Google Drive](https://drive.google.com/file/d/1trHzgpqLnAodt4HEovSwfTH9EoDUtCO1/view?usp=sharing) · 🖥 **Presentation:** [Google Slides](https://docs.google.com/presentation/d/1wclUhLOtDxCCHf1c-qu6v3hQkcyPwOPF/edit?usp=sharing)
 
 ---
 
