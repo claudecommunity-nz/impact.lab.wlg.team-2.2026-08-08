@@ -2,6 +2,8 @@
 import Foundation
 import CoreLocation
 import Observation
+import MapKit
+import SwiftUI
 
 enum AppMode: String, CaseIterable, Identifiable {
     case demo
@@ -29,47 +31,45 @@ final class PictureStore {
     var mode: AppMode = .demo
     var baseURLString: String =
         UserDefaults.standard.string(forKey: "apiBaseURL") ?? "http://127.0.0.1:8080"
+    var serverOK: Bool?
+    var loadState: LoadState = .idle
+
+    var places: [Place] = []
+    var selectedPlaceId: String?
+    var searchText: String = ""
 
     var catalog: DemoCatalog?
     var scenarioId: String?
-    var pointId: String?
 
     var picture: LocationPicture?
-    var loadState: LoadState = .idle
-    var serverOK: Bool?
-
     var mapPins: [MapPin] = []
     var mapPolygons: [OverlayPolygon] = []
-    var mapCenter: LatLng = .lyallBay
+    var mapCenter: LatLng = .wellingtonCBD
+    var cameraPosition: MapCameraPosition = .region(
+        MKCoordinateRegion(
+            center: LatLng.wellingtonCBD.coordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.12, longitudeDelta: 0.12)
+        )
+    )
 
-    var livePreset: LivePreset = .lyallBay
-    var customLat: String = String(LatLng.lyallBay.lat)
-    var customLng: String = String(LatLng.lyallBay.lng)
+    var showWarnings = true
+    var showHazards = true
+    var showConditions = true
+    var showHubs = true
 
     private let client = APIClient()
     private var refreshTask: Task<Void, Never>?
 
-    enum LivePreset: String, CaseIterable, Identifiable {
-        case lyallBay, karori, wellingtonCBD, custom
+    var selectedPlace: Place? {
+        places.first { $0.id == selectedPlaceId }
+    }
 
-        var id: String { rawValue }
-
-        var label: String {
-            switch self {
-            case .lyallBay: return "Lyall Bay"
-            case .karori: return "Karori"
-            case .wellingtonCBD: return "Wellington CBD"
-            case .custom: return "Custom lat/lng"
-            }
-        }
-
-        var latLng: LatLng? {
-            switch self {
-            case .lyallBay: return .lyallBay
-            case .karori: return .karori
-            case .wellingtonCBD: return .wellingtonCBD
-            case .custom: return nil
-            }
+    var filteredPlaces: [Place] {
+        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return places }
+        return places.filter {
+            $0.name.localizedCaseInsensitiveContains(q)
+                || ($0.subtitle?.localizedCaseInsensitiveContains(q) ?? false)
         }
     }
 
@@ -77,8 +77,11 @@ final class PictureStore {
         catalog?.scenarios.first { $0.id == scenarioId }
     }
 
-    var selectedPoint: DemoPointInfo? {
-        selectedScenario?.points.first { $0.id == pointId }
+    var connectionKind: StatusPill.Kind {
+        if case .loading = loadState { return .loading }
+        if serverOK == true { return .online }
+        if serverOK == false { return .offline }
+        return .unknown
     }
 
     func onAppear() {
@@ -96,7 +99,10 @@ final class PictureStore {
     func bootstrap() async {
         applyBaseURL()
         await pingServer()
-        await loadCatalogIfNeeded()
+        rebuildPlaces()
+        if selectedPlaceId == nil {
+            selectedPlaceId = places.first?.id
+        }
         await refresh()
     }
 
@@ -109,31 +115,92 @@ final class PictureStore {
         }
     }
 
-    func loadCatalogIfNeeded() async {
-        guard catalog == nil else { return }
-        do {
-            let cat = try await client.demoScenarios()
-            catalog = cat
-            if scenarioId == nil, let first = cat.scenarios.first {
-                scenarioId = first.id
-                pointId = first.points.first?.id
+    func setMode(_ newMode: AppMode) {
+        guard mode != newMode else { return }
+        mode = newMode
+        rebuildPlaces()
+        selectedPlaceId = places.first?.id
+        Task { await refresh() }
+    }
+
+    func selectPlace(id: String?) {
+        selectedPlaceId = id
+        if let place = selectedPlace {
+            mapCenter = place.latLng
+            withCamera(for: place.latLng)
+            if place.kind == .demoPoint, let sid = place.scenarioId {
+                scenarioId = sid
             }
-        } catch {
-            if mode == .demo {
-                loadState = .error(error.localizedDescription)
-            }
+        }
+        Task { await refresh() }
+    }
+
+    func setScenario(_ id: String) {
+        scenarioId = id
+        rebuildPlaces()
+        if let current = selectedPlace, current.kind == .demoPoint,
+           let match = places.first(where: { $0.demoPointId == current.demoPointId }) {
+            selectedPlaceId = match.id
+        } else {
+            selectedPlaceId = places.first?.id
+        }
+        Task { await refresh() }
+    }
+
+    func rebuildPlaces() {
+        switch mode {
+        case .demo: places = demoPlaces()
+        case .live: places = livePresetPlaces()
         }
     }
 
-    func setMode(_ newMode: AppMode) {
-        mode = newMode
-        Task { await refresh() }
+    private func demoPlaces() -> [Place] {
+        guard let catalog else {
+            return [
+                Place(
+                    id: "demo-lyall-bay",
+                    name: "Lyall Bay",
+                    subtitle: "Demo point",
+                    lat: LatLng.lyallBay.lat,
+                    lng: LatLng.lyallBay.lng,
+                    kind: .demoPoint,
+                    demoPointId: "lyall-bay",
+                    scenarioId: scenarioId ?? "southerly-storm"
+                ),
+                Place(
+                    id: "demo-karori",
+                    name: "Karori",
+                    subtitle: "Demo point",
+                    lat: LatLng.karori.lat,
+                    lng: LatLng.karori.lng,
+                    kind: .demoPoint,
+                    demoPointId: "karori",
+                    scenarioId: scenarioId ?? "southerly-storm"
+                ),
+            ]
+        }
+        let scenario = catalog.scenarios.first { $0.id == scenarioId } ?? catalog.scenarios.first
+        guard let scenario else { return [] }
+        return scenario.points.map { point in
+            Place(
+                id: "demo-\(scenario.id)-\(point.id)",
+                name: point.name,
+                subtitle: scenario.title,
+                lat: point.lat,
+                lng: point.lng,
+                kind: .demoPoint,
+                demoPointId: point.id,
+                scenarioId: scenario.id
+            )
+        }
     }
 
-    func setDemoSelection(scenario: String, point: String) {
-        scenarioId = scenario
-        pointId = point
-        Task { await refresh() }
+    private func livePresetPlaces() -> [Place] {
+        [
+            Place(id: "live-lyall", name: "Lyall Bay", subtitle: "Live preset", lat: LatLng.lyallBay.lat, lng: LatLng.lyallBay.lng, kind: .livePreset, demoPointId: nil, scenarioId: nil),
+            Place(id: "live-karori", name: "Karori", subtitle: "Live preset", lat: LatLng.karori.lat, lng: LatLng.karori.lng, kind: .livePreset, demoPointId: nil, scenarioId: nil),
+            Place(id: "live-cbd", name: "Wellington CBD", subtitle: "Live preset", lat: LatLng.wellingtonCBD.lat, lng: LatLng.wellingtonCBD.lng, kind: .livePreset, demoPointId: nil, scenarioId: nil),
+        ]
     }
 
     func refresh() async {
@@ -152,101 +219,102 @@ final class PictureStore {
         await pingServer()
 
         do {
+            if mode == .demo {
+                try await ensureCatalog()
+                rebuildPlaces()
+            }
+            guard let place = selectedPlace else {
+                loadState = .idle
+                return
+            }
+            withCamera(for: place.latLng)
+            mapCenter = place.latLng
+
             switch mode {
-            case .demo: try await refreshDemo()
-            case .live: try await refreshLive()
+            case .demo: try await refreshDemo(place: place)
+            case .live: try await refreshLive(place: place)
             }
             loadState = .ok
         } catch is CancellationError {
-            // ignore
         } catch {
             loadState = .error(error.localizedDescription)
         }
     }
 
-    private func refreshDemo() async throws {
-        await loadCatalogIfNeeded()
-        guard let scenarioId, let pointId else {
-            throw APIError.http(path: "/v1/demo/picture", status: 400)
+    private func ensureCatalog() async throws {
+        if catalog != nil { return }
+        let cat = try await client.demoScenarios()
+        catalog = cat
+        if scenarioId == nil {
+            scenarioId = cat.scenarios.first?.id
         }
-        if let p = selectedPoint {
-            mapCenter = LatLng(lat: p.lat, lng: p.lng)
+        rebuildPlaces()
+        if selectedPlaceId == nil || !places.contains(where: { $0.id == selectedPlaceId }) {
+            selectedPlaceId = places.first?.id
         }
+    }
 
-        async let pictureReq = client.demoPicture(scenario: scenarioId, point: pointId)
-        async let warningsReq = client.demoWarningsGeoJSON(scenario: scenarioId, point: pointId)
-        async let hazardsReq = client.demoHazardsGeoJSON(scenario: scenarioId, point: pointId)
-        async let conditionsReq = client.demoConditionsGeoJSON(scenario: scenarioId, point: pointId)
+    private func refreshDemo(place: Place) async throws {
+        let scenario = place.scenarioId ?? scenarioId ?? "southerly-storm"
+        let point = place.demoPointId ?? "lyall-bay"
+        scenarioId = scenario
+
+        async let pictureReq = client.demoPicture(scenario: scenario, point: point)
+        async let warningsReq = client.demoWarningsGeoJSON(scenario: scenario, point: point)
+        async let hazardsReq = client.demoHazardsGeoJSON(scenario: scenario, point: point)
+        async let conditionsReq = client.demoConditionsGeoJSON(scenario: scenario, point: point)
 
         let pic = try await pictureReq
         picture = pic
 
-        let warnings = try? await warningsReq
-        let hazards = try? await hazardsReq
-        let conditions = try? await conditionsReq
-
         var polygons: [OverlayPolygon] = []
         var pins: [MapPin] = []
-        if let warnings { polygons += GeoJSONMap.polygons(from: warnings, defaultKind: .warning) }
-        if let hazards {
-            polygons += GeoJSONMap.polygons(from: hazards, defaultKind: .hazard)
-            pins += GeoJSONMap.pins(from: hazards, defaultKind: .hazard)
+        if showWarnings, let w = try? await warningsReq {
+            polygons += GeoJSONMap.polygons(from: w, defaultKind: .warning)
         }
-        if let conditions { pins += GeoJSONMap.pins(from: conditions, defaultKind: .other) }
-
-        pins.append(
-            MapPin(
-                id: "query-point",
-                coordinate: mapCenter.coordinate,
-                title: selectedPoint?.name ?? "Location",
-                subtitle: "Query point",
-                kind: .other
-            )
-        )
-        if let hub = pic.location.nearestHub {
-            pins.append(
-                MapPin(
-                    id: "hub-\(hub.id)",
-                    coordinate: CLLocationCoordinate2D(latitude: hub.lat, longitude: hub.lng),
-                    title: hub.name,
-                    subtitle: String(format: "%.1f km", hub.distanceKm),
-                    kind: .hub
-                )
-            )
+        if showHazards, let h = try? await hazardsReq {
+            polygons += GeoJSONMap.polygons(from: h, defaultKind: .hazard)
         }
+        if showConditions, let c = try? await conditionsReq {
+            pins += GeoJSONMap.pins(from: c, defaultKind: .other)
+        }
+        pins.append(contentsOf: selectionPins(for: place, picture: pic))
         mapPolygons = polygons
         mapPins = pins
     }
 
-    private func refreshLive() async throws {
-        let point = resolvedLivePoint()
-        mapCenter = point
+    private func refreshLive(place: Place) async throws {
+        let point = place.latLng
         let pic = try await client.picture(lat: point.lat, lng: point.lng)
         picture = pic
 
         var polygons: [OverlayPolygon] = []
         var pins: [MapPin] = []
+        if showWarnings, let w = try? await client.warningsGeoJSON(lat: point.lat, lng: point.lng) {
+            polygons += GeoJSONMap.polygons(from: w, defaultKind: .warning)
+        }
+        if showHazards, let h = try? await client.hazardsGeoJSON(lat: point.lat, lng: point.lng) {
+            polygons += GeoJSONMap.polygons(from: h, defaultKind: .hazard)
+        }
+        if showConditions, let c = try? await client.conditionsGeoJSON(lat: point.lat, lng: point.lng) {
+            pins += GeoJSONMap.pins(from: c, defaultKind: .other)
+        }
+        pins.append(contentsOf: selectionPins(for: place, picture: pic))
+        mapPolygons = polygons
+        mapPins = pins
+    }
 
-        if let warnings = try? await client.warningsGeoJSON(lat: point.lat, lng: point.lng) {
-            polygons += GeoJSONMap.polygons(from: warnings, defaultKind: .warning)
-        }
-        if let hazards = try? await client.hazardsGeoJSON(lat: point.lat, lng: point.lng) {
-            polygons += GeoJSONMap.polygons(from: hazards, defaultKind: .hazard)
-        }
-        if let conditions = try? await client.conditionsGeoJSON(lat: point.lat, lng: point.lng) {
-            pins += GeoJSONMap.pins(from: conditions, defaultKind: .other)
-        }
-
-        pins.append(
+    private func selectionPins(for place: Place, picture: LocationPicture) -> [MapPin] {
+        var pins: [MapPin] = [
             MapPin(
-                id: "query-point",
-                coordinate: point.coordinate,
-                title: livePreset.label,
+                id: "query-\(place.id)",
+                coordinate: place.coordinate,
+                title: place.name,
                 subtitle: "Query point",
                 kind: .other
-            )
-        )
-        if let hub = pic.location.nearestHub {
+            ),
+        ]
+        if showHubs, let hub = picture.location.nearestHub {
             pins.append(
                 MapPin(
                     id: "hub-\(hub.id)",
@@ -257,14 +325,15 @@ final class PictureStore {
                 )
             )
         }
-        mapPolygons = polygons
-        mapPins = pins
+        return pins
     }
 
-    private func resolvedLivePoint() -> LatLng {
-        if let preset = livePreset.latLng { return preset }
-        let lat = Double(customLat) ?? LatLng.wellingtonCBD.lat
-        let lng = Double(customLng) ?? LatLng.wellingtonCBD.lng
-        return LatLng(lat: lat, lng: lng)
+    private func withCamera(for point: LatLng) {
+        cameraPosition = .region(
+            MKCoordinateRegion(
+                center: point.coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+            )
+        )
     }
 }

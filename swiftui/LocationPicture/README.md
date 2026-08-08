@@ -1,6 +1,8 @@
 # Location Picture — SwiftUI client
 
-Multiplatform **SwiftUI** app (macOS + iOS) that visualises the Team 2 Location Picture API.
+Multiplatform **SwiftUI** map-first COP for the Team 2 Location Picture API.
+
+**UX inspiration:** [Omega-Networks/Pulse](https://github.com/Omega-Networks/Pulse) interaction patterns (map-first shell, place selection, floating map chrome). This is **not** a Pulse fork and does **not** include NetBox/Zabbix/SSH.
 
 Not a replacement for the Vite/React web UI in `frontend/`. Client only — backend stays open-source Vapor.
 
@@ -16,34 +18,36 @@ Not a replacement for the Vite/React web UI in `frontend/`. Client only — back
 open LocationPicture.xcodeproj
 ```
 
-In Xcode, pick a destination:
+| Destination | Shell |
+|---|---|
+| **My Mac** | `NavigationSplitView`: Places \| Map \| Picture inspector |
+| **iPhone Simulator** | Full-bleed map + places sheet + picture sheet |
 
-- **My Mac** — native macOS SwiftUI window  
-- **iPhone Simulator** — iOS  
-
-Default API base URL: `http://127.0.0.1:8080` (editable in-app for LAN devices).
-
-Info.plist allows local cleartext HTTP for lab demos.
+Default API base URL: `http://127.0.0.1:8080` (Settings gear). Info.plist allows local cleartext HTTP for lab demos.
 
 ## Features
 
 | Mode | Behaviour |
 |---|---|
-| **Demo** | `/v1/demo/scenarios`, picture + GeoJSON map layers |
-| **Live** | `/v1/picture` for Lyall Bay / Karori / CBD / custom lat·lng |
+| **Demo** | Scenario + Lyall Bay / Karori · picture + GeoJSON layers |
+| **Live** | Presets · `/v1/picture` |
 
-Map: warning & hazard polygons, condition pins, hub + query point.  
-Panels: summary, warnings, conditions, hazards, sources, disclaimer.
+Map is primary. Select a place → camera + overlays + inspector update.
 
 ## Layout
 
 ```
 LocationPicture/
-  API/        URLSession client
-  Models/     Codable DTOs (API contract)
-  Services/   PictureStore
-  Views/      Demo/Live, map, picture detail
-  Support/    GeoJSON → MapKit, theme
+  API/             URLSession client
+  Models/          Place + API DTOs
+  Services/        PictureStore (@Observable)
+  DesignSystem/    tokens + chrome components
+  Views/
+    Places/        sidebar / sheet list
+    Map/           MapKit canvas + layer chrome
+    Picture/       inspector + detail sections
+    Settings/      API base URL
+  Support/         GeoJSON → overlays
 ```
 
 ## Licence

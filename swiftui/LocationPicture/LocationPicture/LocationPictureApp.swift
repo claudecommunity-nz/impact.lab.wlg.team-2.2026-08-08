@@ -10,11 +10,11 @@ struct LocationPictureApp: App {
             ContentView()
                 .environment(store)
                 #if os(macOS)
-                .frame(minWidth: 720, minHeight: 560)
+                .frame(minWidth: 960, minHeight: 640)
                 #endif
         }
         #if os(macOS)
-        .defaultSize(width: 980, height: 760)
+        .defaultSize(width: 1280, height: 800)
         #endif
     }
 }
