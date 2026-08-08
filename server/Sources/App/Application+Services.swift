@@ -9,6 +9,7 @@ struct AppServices: Sendable {
     let hubs: HubsService
     let warnings: WarningsService
     let conditions: ConditionsService
+    let hazards: HazardsService
 }
 
 enum AppServicesKey: StorageKey {
@@ -38,13 +39,15 @@ extension Application {
             cache: cache,
             logger: logger
         )
+        let hazards = HazardsService(arcgis: arcgis, cache: cache, logger: logger)
         services = AppServices(
             cache: cache,
             arcgis: arcgis,
             hilltop: hilltop,
             hubs: hubs,
             warnings: warnings,
-            conditions: conditions
+            conditions: conditions,
+            hazards: hazards
         )
     }
 }

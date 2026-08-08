@@ -94,6 +94,16 @@ func routes(_ app: Application) throws {
             radiusKm: radiusKm
         )
     }
+
+    // G4 — static hazard context (planning layers, point-intersect)
+    v1.get("hazards") { req -> HazardsEnvelope in
+        guard let lat = req.query[Double.self, at: "lat"],
+              let lng = req.query[Double.self, at: "lng"]
+        else {
+            throw Abort(.badRequest, reason: "lat and lng are required")
+        }
+        return await req.services.hazards.hazards(at: .init(lat: lat, lng: lng))
+    }
 }
 
 struct HealthzResponse: Content {
