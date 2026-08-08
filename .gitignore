@@ -4,13 +4,16 @@
 *.swp
 *~
 
-# Live snapshot dumps from scripts/test-snapshot.sh — never commit
+# Local dumps / scratch (never commit)
 fixtures/
-scripts/fixtures/
-**/fixtures/snapshots/
+scripts/
 **/fixtures/
+vendor/
 
-# SwiftPM / Xcode local state (not part of the product)
+# Agent / internal notes if recreated locally
+CLAUDE.md
+
+# SwiftPM / Xcode local state
 server/.build/
 server/.swiftpm/
 **/.build/

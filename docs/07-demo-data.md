@@ -67,26 +67,14 @@ Use live for integrity checks; use **`/v1/demo/*`** for the 4‑minute pitch whe
 
 ---
 
-## Local snapshots (not in git)
-
-```bash
-bash scripts/test-snapshot.sh                 # → scripts/fixtures/snapshots/<timestamp>/
-bash scripts/test-snapshot.sh http://localhost:8081
-```
-
-These files mirror live JSON for offline schema checks. They are listed in
-`.gitignore` (`**/fixtures/snapshots/`) and must **not** be committed.
-
----
-
-## Where the mock data lives in the tree
+## Where the mock data lives
 
 ```
 server/Sources/App/Demo/
-  DemoModels.swift        # catalogue DTOs
-  DemoScenarioData.swift  # scenario payloads (Swift, curated)
-  DemoService.swift       # resolve scenario + point → picture / sections
+  DemoModels.swift
+  DemoScenarioData.swift   # scenario payloads (Swift, curated)
+  DemoService.swift
 ```
 
-Edit `DemoScenarioData.swift` to tweak demo stories; keep summary language
-factual (no advice words — same rules as G5).
+Edit `DemoScenarioData.swift` to tweak stories. Summary language stays factual
+(no advice words).
