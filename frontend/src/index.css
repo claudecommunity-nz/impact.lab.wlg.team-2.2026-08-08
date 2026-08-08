@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --color-wcc-yellow: #ffdd00;
+  --color-wcc-charcoal: #2f2f2f;
+  --color-wcc-black: #000000;
+  --color-wcc-white: #ffffff;
+  --color-wcc-alert: #f07000;
+  --color-wcc-link: #0057a8;
+  --color-wcc-link-hover: #00376a;
+  --color-wcc-grey-dark: #595959;
+  --color-wcc-grey-mid: #898989;
+  --color-wcc-grey-light: #949494;
+
+  --font-sans: system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: var(--color-wcc-white);
+  color: var(--color-wcc-charcoal);
+  font-family: var(--font-sans);
+}
