@@ -4,9 +4,6 @@ import PackageDescription
 
 let package = Package(
     name: "App",
-    // Apple SPM minimum for local resolution — not "macOS-only". The server is
-    // open-source Swift/Vapor and is intended to run on Linux with the same stack
-    // (see README "Platform & portability"; two small Darwin/XML call sites).
     platforms: [
         .macOS(.v13),
     ],

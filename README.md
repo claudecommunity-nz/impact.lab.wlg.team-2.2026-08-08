@@ -25,7 +25,9 @@ Tests: `cd server && swift test` (GeoMath suite is offline; Hubs/Warnings hit li
 
 ### Frontend (branch `2-frontend`)
 
-Vite + React + MapLibre web UI (also open source — no Apple runtime):
+Vite + React + MapLibre web UI:
+
+
 
 ```bash
 git checkout 2-frontend
@@ -42,7 +44,6 @@ cd frontend && npm install && npm run dev   # http://localhost:5173, expects API
 | **Imports in app code** | Essentially **Foundation**, **Vapor**, **Logging** only |
 | **Not used on the server** | MapKit, CoreLocation, SwiftUI, Metal, SwiftData — deliberate (this is an API, not an iOS app) |
 | **Licence** | **AGPL-3.0-or-later** — open source end to end |
-| **SPM `platforms: [.macOS(.v13)]`** | Apple *minimum* for local SPM resolution — **not** “Linux forbidden” |
 | **Frontend** | Vite / React / MapLibre |
 
 **Two small Apple-leaning call sites** (everything else is portable as-is):
