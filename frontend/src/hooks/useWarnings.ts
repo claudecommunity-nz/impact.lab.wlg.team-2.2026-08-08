@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { fetchWarnings } from '../api/client'
 import { warningToAlertItem } from '../api/adapters'
-import type { Warning } from '../api/types'
+import type { FetchStatus, Warning } from '../api/types'
 import type { AlertItem } from '../types'
-import type { FetchStatus } from './useLocationWarnings'
 
 interface Params {
   lat?: number

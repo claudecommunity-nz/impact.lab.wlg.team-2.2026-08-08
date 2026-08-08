@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { FavouritesStatus } from './FavouritesStatus'
 import type { Place } from '../types'
 
 interface Props {
@@ -120,8 +119,6 @@ export function LocationPicker({
           </button>
         )}
       </div>
-
-      <FavouritesStatus places={places} />
     </section>
   )
 }

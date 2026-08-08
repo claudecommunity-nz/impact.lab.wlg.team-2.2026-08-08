@@ -31,7 +31,7 @@ function App() {
   return (
     <div className="min-h-screen bg-wcc-white pb-8">
       <Header />
-      <StatusBlock position={position} locationStatus={status} />
+      <StatusBlock position={position} locationStatus={status} places={places} />
       <LiveConditions position={position} locationStatus={status} />
       <LocationPicker
         places={places}

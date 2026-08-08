@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchConditions } from '../api/client'
-import type { ConditionsEnvelope } from '../api/types'
-import type { FetchStatus } from './useLocationWarnings'
+import type { ConditionsEnvelope, FetchStatus } from '../api/types'
 
 export function useConditions(lat: number | undefined, lng: number | undefined) {
   const [conditions, setConditions] = useState<ConditionsEnvelope | null>(null)

@@ -1,7 +1,12 @@
 import { formatAge, formatUntil } from '../lib/time'
 import type { Warning } from '../api/types'
 
-export function WarningCard({ warning }: { warning: Warning }) {
+interface Props {
+  warning: Warning
+  locationLabels?: string[]
+}
+
+export function WarningCard({ warning, locationLabels }: Props) {
   return (
     <li className="rounded-lg border-l-4 border-wcc-alert bg-orange-50 p-3 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -21,6 +26,9 @@ export function WarningCard({ warning }: { warning: Warning }) {
       </div>
 
       {warning.expires && <p className="mt-1 text-xs text-wcc-grey-dark">{formatUntil(warning.expires)}</p>}
+      {locationLabels && locationLabels.length > 0 && (
+        <p className="mt-1 text-xs font-medium text-wcc-link">Covers: {locationLabels.join(', ')}</p>
+      )}
       {warning.headline && <p className="mt-1.5 text-sm text-wcc-charcoal">{warning.headline}</p>}
 
       {warning.description && (

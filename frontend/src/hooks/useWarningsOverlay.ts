@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchWarningsGeoJSON } from '../api/client'
-import type { GeoJSONFeatureCollection } from '../api/types'
-import type { FetchStatus } from './useLocationWarnings'
+import type { FetchStatus, GeoJSONFeatureCollection } from '../api/types'
 
 const EMPTY: GeoJSONFeatureCollection = { type: 'FeatureCollection', features: [] }
 

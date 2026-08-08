@@ -1,3 +1,5 @@
+export type FetchStatus = 'loading' | 'ok' | 'error'
+
 export type Trust = 'official' | 'lifeline' | 'planning' | 'community-unverified'
 
 export interface SourceMeta {
