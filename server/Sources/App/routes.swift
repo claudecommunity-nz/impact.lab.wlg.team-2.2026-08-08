@@ -96,13 +96,41 @@ func routes(_ app: Application) throws {
     }
 
     // G4 — static hazard context (planning layers, point-intersect)
-    v1.get("hazards") { req -> HazardsEnvelope in
+    // `?format=geojson` returns real WCC/NIWA ArcGIS polygon rings at the point.
+    v1.get("hazards") { req -> Response in
         guard let lat = req.query[Double.self, at: "lat"],
               let lng = req.query[Double.self, at: "lng"]
         else {
             throw Abort(.badRequest, reason: "lat and lng are required")
         }
-        return await req.services.hazards.hazards(at: .init(lat: lat, lng: lng))
+        let point = GeoMath.Coordinate(lat: lat, lng: lng)
+        let format = (req.query[String.self, at: "format"] ?? "json").lowercased()
+
+        if format == "geojson" {
+            let polygons = await req.services.hazards.polygons(at: point)
+            let features: [GeoJSONPolygonFeature<HazardGeoJSONProperties>] = polygons.map { pair in
+                GeoJSONPolygonFeature(
+                    geometry: .from(rings: pair.rings),
+                    properties: HazardGeoJSONProperties(
+                        id: pair.item.id,
+                        layer: pair.item.layer,
+                        value: pair.item.value,
+                        detail: pair.item.detail,
+                        publisher: pair.item.publisher,
+                        sourceId: pair.item.source.id
+                    )
+                )
+            }
+            let collection = GeoJSONPolygonFeatureCollection(features: features)
+            let response = Response(status: .ok)
+            try response.content.encode(collection, as: .json)
+            return response
+        }
+
+        let envelope = await req.services.hazards.hazards(at: point)
+        let response = Response(status: .ok)
+        try response.content.encode(envelope, as: .json)
+        return response
     }
 
     // G5 — full Location Picture (fan-out + factual summary)
@@ -138,14 +166,18 @@ func routes(_ app: Application) throws {
         return try req.services.demo.picture(scenarioId: scenario, pointId: point)
     }
 
-    // Warnings JSON or polygon GeoJSON for the map
+    // Warnings JSON (staged narrative) or CAP GeoJSON (real MetService/NEMA rings).
     demo.get("warnings") { req -> Response in
         let scenario = try req.query.get(String.self, at: "scenario")
         let point = try req.query.get(String.self, at: "point")
         let format = (req.query[String.self, at: "format"] ?? "json").lowercased()
-        let records = try req.services.demo.warningRecords(scenarioId: scenario, pointId: point)
 
         if format == "geojson" {
+            // Real CAP polygons only — empty when feeds are calm (no invented storm boxes).
+            let records = try await req.services.demo.warningRecords(
+                scenarioId: scenario,
+                pointId: point
+            )
             let collection = GeoJSONPolygonFeatureCollection(
                 features: records.map { $0.asGeoJSONFeature() }
             )
@@ -154,7 +186,7 @@ func routes(_ app: Application) throws {
             return response
         }
 
-        let section = OfficialWarningsSection.ok(records.map(\.warning))
+        let section = try req.services.demo.warnings(scenarioId: scenario, pointId: point)
         let response = Response(status: .ok)
         try response.content.encode(section, as: .json)
         return response
@@ -183,14 +215,14 @@ func routes(_ app: Application) throws {
         return response
     }
 
-    // Hazards JSON or polygon GeoJSON (planning zones for the map)
+    // Hazards JSON (staged picture slice) or GeoJSON from live WCC ArcGIS at the point.
     demo.get("hazards") { req -> Response in
         let scenario = try req.query.get(String.self, at: "scenario")
         let point = try req.query.get(String.self, at: "point")
         let format = (req.query[String.self, at: "format"] ?? "json").lowercased()
 
         if format == "geojson" {
-            let polygons = try req.services.demo.hazardPolygons(
+            let polygons = try await req.services.demo.hazardPolygons(
                 scenarioId: scenario,
                 pointId: point
             )

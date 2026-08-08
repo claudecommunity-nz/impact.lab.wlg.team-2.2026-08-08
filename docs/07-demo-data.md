@@ -62,23 +62,30 @@ Drop any of those FeatureCollections straight into MapLibre / geojson.io.
 | **`calm-day`** | No warnings; planning polygons still differ by point. |
 | **`degraded`** | Conditions unavailable; warnings (with polygon) + hazards still present. |
 
-### Polygon design (demo, not real council boundaries)
+### Map polygons (real GIS only — never invented)
 
-Multi-vertex rings (not axis-aligned 4-corner boxes) so map UIs draw coastal /
-metro shapes. Schematic only — not real WCC cadastre.
+Demo **picture text** can be staged for pitch rehearsal. Demo **map GeoJSON**
+always pulls live geometry:
 
-| Layer | Geometry intent |
+| Layer | Source |
 |---|---|
-| Heavy rain warning | Multi-point Wellington metro outline covering **both** demo points |
-| Tsunami orange zone | Scalloped south-coast strip: **Lyall Bay inside**, Karori outside |
-| Coastal inundation (medium) | Tighter multi-point coastal band: **Lyall only** |
+| Warning polygons | MetService + NEMA CAP FeatureServers (empty when CAP is calm) |
+| Hazard polygons | WCC ArcGIS (tsunami, coastal inundation, stream corridor) at the demo point |
+
+No schematic / 4-corner “boxes”. If the map has no warning polygon, CAP is calm
+— that is correct for a real platform.
 
 ---
 
 ## Live API (unchanged)
 
 `/healthz`, `/v1/hubs`, `/v1/warnings`, `/v1/conditions`, `/v1/hazards`, `/v1/picture`  
-Hubs GeoJSON: `/v1/hubs?format=geojson` (real WREMO points).
+
+GeoJSON (real rings / points):
+
+- `/v1/hubs?format=geojson` — WREMO hubs  
+- `/v1/warnings?format=geojson` — CAP polygons  
+- `/v1/hazards?lat&lng&format=geojson` — WCC planning polygons at point  
 
 ---
 

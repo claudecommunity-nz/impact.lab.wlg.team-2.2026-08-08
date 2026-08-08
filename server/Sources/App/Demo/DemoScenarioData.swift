@@ -136,83 +136,7 @@ enum DemoScenarioData {
         age: 210
     )
 
-    // MARK: - Demo polygons (WGS84 lng/lat) for map GeoJSON
-    //
-    // Intentionally multi-vertex (not 4-corner boxes) so map clients render as
-    // coastal / metro shapes rather than axis-aligned squares. Still schematic —
-    // not real council cadastre. Coverage rules are enforced by tests:
-    //   • warning: Lyall Bay + Karori inside
-    //   • tsunami / coastal: Lyall Bay inside, Karori outside
-
-    /// Ring helper: pairs are `(lng, lat)`. First point should equal last (closed).
-    private static func ring(_ pairs: [(Double, Double)]) -> [GeoMath.Coordinate] {
-        pairs.map { GeoMath.Coordinate(lat: $0.1, lng: $0.0) }
-    }
-
-    /// Wellington metro / ranges outline — covers both Lyall Bay and Karori ("same storm").
-    /// Clockwise coastal → harbour → hills → back to south coast.
-    static let wellingtonWarningRing: [GeoMath.Coordinate] = ring([
-        (174.705, -41.348), // Owhiro Bay / south-west
-        (174.725, -41.355), // Island Bay
-        (174.748, -41.352), // Houghton Bay
-        (174.770, -41.345), // Melrose coast
-        (174.792, -41.338), // Lyall Bay foreshore
-        (174.810, -41.328), // Rongotai / airport
-        (174.830, -41.318), // Miramar south
-        (174.845, -41.305), // Breaker Bay / Seatoun
-        (174.840, -41.290), // Miramar north
-        (174.825, -41.278), // Hataitai
-        (174.805, -41.268), // Oriental Bay / CBD
-        (174.785, -41.255), // Thorndon / Pipitea
-        (174.760, -41.248), // Ngaio hills
-        (174.735, -41.255), // Karori north ridge
-        (174.715, -41.275), // Karori west
-        (174.705, -41.300), // Makara Stream saddle
-        (174.700, -41.325), // Brooklyn / Vogeltown
-        (174.705, -41.348), // close
-    ])
-
-    /// South-coast tsunami orange strip: follows the shoreline with a scalloped
-    /// inland edge — contains Lyall Bay, excludes Karori (further north-west).
-    static let tsunamiOrangeRing: [GeoMath.Coordinate] = ring([
-        // Seaward edge (west → east along south coast)
-        (174.752, -41.350),
-        (174.762, -41.354),
-        (174.772, -41.352),
-        (174.782, -41.346),
-        (174.792, -41.340), // Lyall Bay beach
-        (174.802, -41.336),
-        (174.812, -41.332),
-        (174.822, -41.326),
-        (174.828, -41.320),
-        // Inland edge (east → west), north of Lyall, well south of Karori
-        (174.820, -41.314),
-        (174.808, -41.316),
-        (174.796, -41.318),
-        (174.784, -41.320),
-        (174.772, -41.324),
-        (174.762, -41.332),
-        (174.754, -41.340),
-        (174.752, -41.350), // close
-    ])
-
-    /// Tighter coastal inundation band hugging Lyall Bay only (subset of tsunami strip).
-    static let coastalInundationRing: [GeoMath.Coordinate] = ring([
-        (174.778, -41.342),
-        (174.786, -41.340),
-        (174.794, -41.337),
-        (174.802, -41.334),
-        (174.808, -41.330),
-        (174.810, -41.326),
-        (174.806, -41.323),
-        (174.798, -41.324),
-        (174.790, -41.326),
-        (174.782, -41.330),
-        (174.778, -41.336),
-        (174.778, -41.342), // close
-    ])
-
-    // MARK: - Shared warning (covers both demo points)
+    // MARK: - Shared staged warning (narrative only — map geometry is live CAP)
 
     private static func wellingtonHeavyRain() -> Warning {
         Warning(
@@ -230,51 +154,6 @@ enum DemoScenarioData {
             web: "https://metservice.com/warnings/home",
             source: metSource
         )
-    }
-
-    private static func wellingtonHeavyRainRecord() -> WarningRecord {
-        WarningRecord(warning: wellingtonHeavyRain(), rings: [wellingtonWarningRing])
-    }
-
-    /// Warning polygons for map (`?format=geojson`). Filtered to those covering the point.
-    static func warningRecords(
-        scenario: ScenarioID,
-        point: PointID
-    ) -> [WarningRecord] {
-        let coord = GeoMath.Coordinate(lat: point.lat, lng: point.lng)
-        switch scenario {
-        case .southerlyStorm, .degraded:
-            let record = wellingtonHeavyRainRecord()
-            return record.covers(coord) ? [record] : []
-        case .calmDay:
-            return []
-        }
-    }
-
-    /// Hazard polygons for map. Lyall Bay has tsunami + coastal; Karori has none.
-    static func hazardPolygons(
-        scenario: ScenarioID,
-        point: PointID
-    ) -> [(item: HazardItem, rings: [[GeoMath.Coordinate]])] {
-        // Calm / storm / degraded all keep the same planning contrast for the two points.
-        switch point {
-        case .lyallBay:
-            let items = lyallHazards().items
-            var out: [(HazardItem, [[GeoMath.Coordinate]])] = []
-            for item in items {
-                switch item.id {
-                case "tsunami-evacuation-zones":
-                    out.append((item, [tsunamiOrangeRing]))
-                case "coastal-inundation-medium":
-                    out.append((item, [coastalInundationRing]))
-                default:
-                    break
-                }
-            }
-            return out
-        case .karori:
-            return []
-        }
     }
 
     // MARK: - Hubs
@@ -588,13 +467,15 @@ enum DemoScenarioData {
 
         switch scenario {
         case .southerlyStorm:
-            warnings = .ok(warningRecords(scenario: scenario, point: point).map(\.warning))
+            // Staged CAP narrative for pitch when live feeds are calm.
+            // Map GeoJSON uses live MetService/NEMA rings only (see DemoService).
+            warnings = .ok([wellingtonHeavyRain()])
             conditions = point == .lyallBay ? lyallStormConditions() : karoriStormConditions()
         case .calmDay:
             warnings = .ok([])
             conditions = point == .lyallBay ? lyallCalmConditions() : karoriCalmConditions()
         case .degraded:
-            warnings = .ok(warningRecords(scenario: scenario, point: point).map(\.warning))
+            warnings = .ok([wellingtonHeavyRain()])
             conditions = .unavailable("hilltop.gw.govt.nz timed out (demo)")
         }
 

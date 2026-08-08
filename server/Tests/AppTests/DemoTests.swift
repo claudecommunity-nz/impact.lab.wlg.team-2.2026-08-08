@@ -117,47 +117,30 @@ struct DemoTests {
         }
     }
 
-    @Test("Demo polygons: warning covers both points; tsunami only Lyall Bay")
-    func demoPolygonCoverage() {
-        let lyall = GeoMath.Coordinate(lat: -41.3286, lng: 174.7947)
-        let karori = GeoMath.Coordinate(lat: -41.2865, lng: 174.7405)
-
-        // Multi-vertex rings (not 4-corner boxes) — map clients must not draw squares.
-        #expect(DemoScenarioData.wellingtonWarningRing.count >= 12)
-        #expect(DemoScenarioData.tsunamiOrangeRing.count >= 12)
-        #expect(DemoScenarioData.coastalInundationRing.count >= 10)
-
-        #expect(GeoMath.pointInPolygon(point: lyall, ring: DemoScenarioData.wellingtonWarningRing))
-        #expect(GeoMath.pointInPolygon(point: karori, ring: DemoScenarioData.wellingtonWarningRing))
-        #expect(GeoMath.pointInPolygon(point: lyall, ring: DemoScenarioData.tsunamiOrangeRing))
-        #expect(!GeoMath.pointInPolygon(point: karori, ring: DemoScenarioData.tsunamiOrangeRing))
-        #expect(GeoMath.pointInPolygon(point: lyall, ring: DemoScenarioData.coastalInundationRing))
-        #expect(!GeoMath.pointInPolygon(point: karori, ring: DemoScenarioData.coastalInundationRing))
-    }
-
-    @Test("Demo warnings GeoJSON has Polygon geometry for both points")
+    @Test("Demo warnings GeoJSON uses live CAP rings only (never invented boxes)")
     func warningsGeoJSON() async throws {
         try await withApp(configure: configure) { app in
-            for point in ["lyall-bay", "karori"] {
-                try await app.testing().test(
-                    .GET,
-                    "v1/demo/warnings?scenario=southerly-storm&point=\(point)&format=geojson"
-                ) { res async throws in
-                    #expect(res.status == .ok)
-                    let body = try res.content.decode(
-                        GeoJSONPolygonFeatureCollection<WarningGeoJSONProperties>.self
-                    )
-                    #expect(body.type == "FeatureCollection")
-                    #expect(body.features.count == 1)
-                    #expect(body.features[0].geometry.type == "Polygon")
-                    #expect(!body.features[0].geometry.coordinates.isEmpty)
-                    #expect(body.features[0].properties.event == "rain")
+            try await app.testing().test(
+                .GET,
+                "v1/demo/warnings?scenario=southerly-storm&point=lyall-bay&format=geojson"
+            ) { res async throws in
+                #expect(res.status == .ok)
+                let body = try res.content.decode(
+                    GeoJSONPolygonFeatureCollection<WarningGeoJSONProperties>.self
+                )
+                #expect(body.type == "FeatureCollection")
+                // Calm day → empty; active CAP → real multi-vertex rings from MetService/NEMA.
+                for f in body.features {
+                    #expect(f.geometry.type == "Polygon")
+                    #expect(!f.geometry.coordinates.isEmpty)
+                    let ring = f.geometry.coordinates[0]
+                    #expect(ring.count >= 4)
                 }
             }
         }
     }
 
-    @Test("Demo hazards GeoJSON: Lyall has polygons, Karori empty")
+    @Test("Demo hazards GeoJSON uses live WCC ArcGIS rings at the point")
     func hazardsGeoJSON() async throws {
         try await withApp(configure: configure) { app in
             try await app.testing().test(
@@ -168,24 +151,22 @@ struct DemoTests {
                 let body = try res.content.decode(
                     GeoJSONPolygonFeatureCollection<HazardGeoJSONProperties>.self
                 )
-                #expect(body.features.count >= 2)
+                // Lyall Bay is in real tsunami / coastal layers; if GIS is reachable we get rings.
                 for f in body.features {
                     #expect(f.geometry.type == "Polygon")
+                    #expect(!f.geometry.coordinates.isEmpty)
+                    // Real cadastre is multi-vertex — not 4-corner boxes.
+                    #expect(f.geometry.coordinates[0].count >= 6)
                 }
-                let ids = Set(body.features.map(\.properties.id))
-                #expect(ids.contains("tsunami-evacuation-zones"))
-                #expect(ids.contains("coastal-inundation-medium"))
-            }
-
-            try await app.testing().test(
-                .GET,
-                "v1/demo/hazards?scenario=southerly-storm&point=karori&format=geojson"
-            ) { res async throws in
-                #expect(res.status == .ok)
-                let body = try res.content.decode(
-                    GeoJSONPolygonFeatureCollection<HazardGeoJSONProperties>.self
-                )
-                #expect(body.features.isEmpty)
+                if !body.features.isEmpty {
+                    let ids = Set(body.features.map(\.properties.id))
+                    #expect(
+                        ids.contains("tsunami-evacuation-zones")
+                            || ids.contains("coastal-inundation-medium")
+                            || ids.contains("coastal-inundation-high")
+                            || ids.contains("stream-corridor")
+                    )
+                }
             }
         }
     }

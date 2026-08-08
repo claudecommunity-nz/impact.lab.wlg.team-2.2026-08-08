@@ -2,8 +2,16 @@
 import Foundation
 import Vapor
 
-/// Serves curated demo scenarios under `/v1/demo/*` (offline / judge-safe).
+/// Serves curated demo scenarios under `/v1/demo/*`.
+///
+/// **Map polygons are never invented.** Hazard GeoJSON is live WCC/NIWA ArcGIS
+/// at the demo point; warning GeoJSON is live MetService/NEMA CAP at that point.
+/// Staged narrative (picture text / condition pins) stays under `/v1/demo` so
+/// judges can rehearse when CAP is calm — geometry always reflects real sources.
 struct DemoService: Sendable {
+    let hazards: HazardsService
+    let warnings: WarningsService
+
     func catalog() -> DemoCatalog {
         DemoScenarioData.catalog()
     }
@@ -18,11 +26,12 @@ struct DemoService: Sendable {
         try picture(scenarioId: scenarioId, pointId: pointId).officialWarnings
     }
 
-    /// Warning records with rings for `?format=geojson` map layers.
-    func warningRecords(scenarioId: String, pointId: String) throws -> [WarningRecord] {
-        let scenario = try parseScenario(scenarioId)
+    /// Live CAP polygons covering the demo point (real rings only; may be empty when calm).
+    func warningRecords(scenarioId: String, pointId: String) async throws -> [WarningRecord] {
+        _ = try parseScenario(scenarioId)
         let point = try parsePoint(pointId)
-        return DemoScenarioData.warningRecords(scenario: scenario, point: point)
+        let coord = GeoMath.Coordinate(lat: point.lat, lng: point.lng)
+        return try await warnings.warningRecords(at: coord)
     }
 
     func conditions(scenarioId: String, pointId: String) throws -> LocalConditionsSection {
@@ -33,14 +42,15 @@ struct DemoService: Sendable {
         try picture(scenarioId: scenarioId, pointId: pointId).hazardContext
     }
 
-    /// Hazard polygons for `?format=geojson` (tsunami / coastal at Lyall Bay).
+    /// Live WCC planning polygons at the demo point (real ArcGIS rings).
     func hazardPolygons(
         scenarioId: String,
         pointId: String
-    ) throws -> [(item: HazardItem, rings: [[GeoMath.Coordinate]])] {
-        let scenario = try parseScenario(scenarioId)
+    ) async throws -> [(item: HazardItem, rings: [[GeoMath.Coordinate]])] {
+        _ = try parseScenario(scenarioId)
         let point = try parsePoint(pointId)
-        return DemoScenarioData.hazardPolygons(scenario: scenario, point: point)
+        let coord = GeoMath.Coordinate(lat: point.lat, lng: point.lng)
+        return await hazards.polygons(at: coord)
     }
 
     /// Point features: gauges, outages, water faults, nearest hub (for map pins).

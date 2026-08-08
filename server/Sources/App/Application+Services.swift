@@ -49,7 +49,7 @@ extension Application {
             hazards: hazards,
             logger: logger
         )
-        let demo = DemoService()
+        let demo = DemoService(hazards: hazards, warnings: warnings)
         services = AppServices(
             cache: cache,
             arcgis: arcgis,

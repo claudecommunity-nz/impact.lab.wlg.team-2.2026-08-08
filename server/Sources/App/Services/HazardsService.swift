@@ -148,18 +148,25 @@ actor HazardsService {
         return envelope
     }
 
+    /// Real WCC/NIWA polygon rings for map GeoJSON (`?format=geojson`).
+    /// Geometry comes only from ArcGIS — never synthesised.
+    func polygons(at point: GeoMath.Coordinate) async -> [(item: HazardItem, rings: [[GeoMath.Coordinate]])] {
+        var out: [(HazardItem, [[GeoMath.Coordinate]])] = []
+        for layer in Self.layers {
+            do {
+                let pairs = try await queryLayerPolygons(layer, at: point)
+                out.append(contentsOf: pairs)
+            } catch {
+                logger.warning("Hazard polygon layer \(layer.id) failed: \(error)")
+            }
+        }
+        return out
+    }
+
     // MARK: - Per-layer query
 
     private func queryLayer(_ layer: LayerDef, at point: GeoMath.Coordinate) async throws -> [HazardItem] {
         let geometry = "\(point.lng),\(point.lat)"
-        let sourceTemplate = SourceMeta(
-            name: layer.sourceName,
-            id: layer.id,
-            trust: .planning,
-            fetchedAt: Date(),
-            url: layer.url
-        )
-
         switch layer.kind {
         case .tsunami:
             let (features, fetchedAt): ([ArcGISFeature<TsunamiZoneRawAttributes>], Date) =
@@ -171,50 +178,10 @@ actor HazardsService {
                     inSR: "4326",
                     spatialRel: "esriSpatialRelIntersects"
                 )
-            let source = SourceMeta(
-                name: sourceTemplate.name,
-                id: sourceTemplate.id,
-                trust: .planning,
-                fetchedAt: fetchedAt,
-                url: layer.url
-            )
+            let source = Self.sourceMeta(layer: layer, fetchedAt: fetchedAt)
             return features.map { feature in
-                let raw = feature.attributes
-                let colour = raw.Col_Code?.trimmingCharacters(in: .whitespacesAndNewlines)
-                let zone = raw.Evac_Zone?.trimmingCharacters(in: .whitespacesAndNewlines)
-                let value: String
-                if let colour, !colour.isEmpty {
-                    // Normalise "orange" / "Orange" → "Orange Zone"
-                    let titled = colour.prefix(1).uppercased() + colour.dropFirst().lowercased()
-                    value = titled.lowercased().contains("zone") ? titled : "\(titled) Zone"
-                } else if let zone, !zone.isEmpty {
-                    value = zone
-                } else {
-                    value = "inside"
-                }
-                var detailParts: [String] = []
-                if let zc = raw.Zone_Class {
-                    detailParts.append("Zone_Class \(zc)")
-                }
-                if let loc = raw.Location, !loc.isEmpty {
-                    detailParts.append(loc)
-                }
-                if let heights = raw.Heights, !heights.isEmpty {
-                    detailParts.append(heights)
-                }
-                if let info = raw.Info, !info.isEmpty, detailParts.isEmpty {
-                    detailParts.append(info)
-                }
-                return HazardItem(
-                    layer: layer.displayName,
-                    id: layer.id,
-                    value: value,
-                    detail: detailParts.isEmpty ? nil : detailParts.joined(separator: " — "),
-                    publisher: layer.publisher,
-                    source: source
-                )
+                Self.tsunamiItem(layer: layer, source: source, raw: feature.attributes)
             }
-
         case .presence:
             let (features, fetchedAt): ([ArcGISFeature<EmptyAttributes>], Date) =
                 try await arcgis.query(
@@ -226,14 +193,8 @@ actor HazardsService {
                     spatialRel: "esriSpatialRelIntersects"
                 )
             guard !features.isEmpty else { return [] }
-            let source = SourceMeta(
-                name: sourceTemplate.name,
-                id: sourceTemplate.id,
-                trust: .planning,
-                fetchedAt: fetchedAt,
-                url: layer.url
-            )
-            // One item per layer when the point intersects (not one per feature).
+            let source = Self.sourceMeta(layer: layer, fetchedAt: fetchedAt)
+            // One item per layer for the picture envelope (not one per feature).
             return [
                 HazardItem(
                     layer: layer.displayName,
@@ -245,6 +206,110 @@ actor HazardsService {
                 ),
             ]
         }
+    }
+
+    /// One map feature per ArcGIS polygon that intersects the point (real rings).
+    private func queryLayerPolygons(
+        _ layer: LayerDef,
+        at point: GeoMath.Coordinate
+    ) async throws -> [(item: HazardItem, rings: [[GeoMath.Coordinate]])] {
+        let geometry = "\(point.lng),\(point.lat)"
+        switch layer.kind {
+        case .tsunami:
+            let (features, fetchedAt): ([ArcGISFeature<TsunamiZoneRawAttributes>], Date) =
+                try await arcgis.query(
+                    layerURL: layer.url,
+                    outFields: "Evac_Zone,Zone_Class,Col_Code,Location,Info,Heights",
+                    geometry: geometry,
+                    geometryType: "esriGeometryPoint",
+                    inSR: "4326",
+                    spatialRel: "esriSpatialRelIntersects"
+                )
+            let source = Self.sourceMeta(layer: layer, fetchedAt: fetchedAt)
+            return features.compactMap { feature -> (HazardItem, [[GeoMath.Coordinate]])? in
+                guard let rings = Self.rings(from: feature.geometry) else { return nil }
+                let item = Self.tsunamiItem(layer: layer, source: source, raw: feature.attributes)
+                return (item, rings)
+            }
+        case .presence:
+            let (features, fetchedAt): ([ArcGISFeature<EmptyAttributes>], Date) =
+                try await arcgis.query(
+                    layerURL: layer.url,
+                    outFields: "*",
+                    geometry: geometry,
+                    geometryType: "esriGeometryPoint",
+                    inSR: "4326",
+                    spatialRel: "esriSpatialRelIntersects"
+                )
+            let source = Self.sourceMeta(layer: layer, fetchedAt: fetchedAt)
+            return features.compactMap { feature -> (HazardItem, [[GeoMath.Coordinate]])? in
+                guard let rings = Self.rings(from: feature.geometry) else { return nil }
+                let item = HazardItem(
+                    layer: layer.displayName,
+                    id: layer.id,
+                    value: "inside",
+                    detail: nil,
+                    publisher: layer.publisher,
+                    source: source
+                )
+                return (item, rings)
+            }
+        }
+    }
+
+    private static func sourceMeta(layer: LayerDef, fetchedAt: Date) -> SourceMeta {
+        SourceMeta(
+            name: layer.sourceName,
+            id: layer.id,
+            trust: .planning,
+            fetchedAt: fetchedAt,
+            url: layer.url
+        )
+    }
+
+    private static func tsunamiItem(
+        layer: LayerDef,
+        source: SourceMeta,
+        raw: TsunamiZoneRawAttributes
+    ) -> HazardItem {
+        let colour = raw.Col_Code?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let zone = raw.Evac_Zone?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let value: String
+        if let colour, !colour.isEmpty {
+            let titled = colour.prefix(1).uppercased() + colour.dropFirst().lowercased()
+            value = titled.lowercased().contains("zone") ? titled : "\(titled) Zone"
+        } else if let zone, !zone.isEmpty {
+            value = zone
+        } else {
+            value = "inside"
+        }
+        var detailParts: [String] = []
+        if let zc = raw.Zone_Class {
+            detailParts.append("Zone_Class \(zc)")
+        }
+        if let loc = raw.Location, !loc.isEmpty {
+            detailParts.append(loc)
+        }
+        if let heights = raw.Heights, !heights.isEmpty {
+            detailParts.append(heights)
+        }
+        if let info = raw.Info, !info.isEmpty, detailParts.isEmpty {
+            detailParts.append(info)
+        }
+        return HazardItem(
+            layer: layer.displayName,
+            id: layer.id,
+            value: value,
+            detail: detailParts.isEmpty ? nil : detailParts.joined(separator: " — "),
+            publisher: layer.publisher,
+            source: source
+        )
+    }
+
+    private static func rings(from geometry: ArcGISGeometry?) -> [[GeoMath.Coordinate]]? {
+        guard let raw = geometry?.rings, !raw.isEmpty else { return nil }
+        let rings = GeoMath.rings(fromArcGIS: raw).filter { $0.count >= 3 }
+        return rings.isEmpty ? nil : rings
     }
 
     /// Round to ~11 m so nearby clicks share a 1 h cache entry.
