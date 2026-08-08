@@ -1,12 +1,28 @@
+# macOS / editor noise
 .DS_Store
+**/.DS_Store
+*.swp
+*~
 
 # Live snapshot dumps from scripts/test-snapshot.sh — never commit
-# (path varies depending on cwd; cover both)
-fixtures/snapshots/
-scripts/fixtures/snapshots/
+fixtures/
+scripts/fixtures/
 **/fixtures/snapshots/
+**/fixtures/
 
-# Derived build products
+# SwiftPM / Xcode local state (not part of the product)
 server/.build/
+server/.swiftpm/
+**/.build/
+**/.swiftpm/
 *.xcodeproj/
+*.xcworkspace/
 xcuserdata/
+**/xcuserdata/
+DerivedData/
+**/DerivedData/
+
+# Secrets / local env
+.env
+.env.*
+.netrc

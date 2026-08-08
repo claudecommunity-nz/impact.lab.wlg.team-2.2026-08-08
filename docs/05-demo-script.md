@@ -46,10 +46,11 @@ WREMO hubs). Click Lyall Bay.
 coastal layers, different gauges, different faults. "Same storm, different
 street. That's location-first."
 
-**2:45–3:30 — It composes.** Show `curl …/v1/picture?lat=…` JSON in a
-terminal, then `/v1/hubs?format=geojson` dropped into the shared COP map.
-"This isn't a closed demo — it's an API. Any of the other nine prototypes,
-or a WREMO screen, can consume the same picture. AGPLv3, so it stays open."
+**2:45–3:30 — It composes.** Prefer curated demo data if the day is calm:
+`curl '…/v1/demo/picture?scenario=southerly-storm&point=lyall-bay'` then the
+Karori point (same warning, different hazards) — see `07-demo-data.md`.
+Optionally show live `/v1/picture` or `/v1/hubs?format=geojson` on the COP map.
+"This isn't a closed demo — it's an API. AGPLv3, so it stays open."
 
 **3:30–4:00 — Honesty features.** Point at: age chips, the
 planning-vs-live labelling, the degraded-source state (`status:
